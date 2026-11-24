@@ -1,0 +1,50 @@
+name: retrain
+
+on:
+  schedule:
+    - cron: "41 9 1 11,12,1,2,3 *"      # first of each month in season
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hoop2vec-refresh
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Restore data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: hoop2vec-data-${{ github.run_id }}
+          restore-keys: hoop2vec-data-
+      - name: Rebuild features, retrain the game models, rerun the backtest, publish
+        run: python -m hoop2vec all
+      - name: Save data cache (even if a later step fails)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: hoop2vec-data-${{ github.run_id }}
+      - name: Commit results
+        run: |
+          git config user.name "Michael W. Kearney"
+          git config user.email "13401460+mkearney@users.noreply.github.com"
+          git add docs/data artifacts history
+          git diff --cached --quiet || git commit -m "Retrain + backtest $(date -u +%F)"
+          git pull --rebase --autostash
+          git push

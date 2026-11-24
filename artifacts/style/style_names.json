@@ -1,0 +1,223 @@
+{
+  "offense": {
+    "factors": [
+      {
+        "name": "Pace & Transition",
+        "low": "Half-court grind",
+        "high": "Run-and-gun",
+        "desc": "How often possessions end in early-clock / transition shots (after steals, rebounds and even made baskets) versus long, late-clock half-court possessions."
+      },
+      {
+        "name": "Ball Movement",
+        "low": "Self-created shots",
+        "high": "Assist-driven",
+        "desc": "Share of made baskets that are assisted, at the rim, from mid-range and from three. Low = isolation / one-on-one creation."
+      },
+      {
+        "name": "Shot Diet",
+        "low": "Mid-range heavy",
+        "high": "Three-point heavy",
+        "desc": "Where the jump shots come from: the 3-point line or 2-point jumpers. Three-heavy teams also tend to crash the glass less."
+      },
+      {
+        "name": "Foul Pressure",
+        "low": "Avoids contact",
+        "high": "Draws fouls",
+        "desc": "How often the offense forces defensive fouls and gets to the line, including early in the shot clock."
+      },
+      {
+        "name": "Risk Profile",
+        "low": "Ball control",
+        "high": "High-variance",
+        "desc": "Turnovers (especially live-ball) plus offensive rebounding and dunks: an aggressive, chaotic offense versus a careful one."
+      },
+      {
+        "name": "Rim Pressure",
+        "low": "Jump-shooting",
+        "high": "Rim attack",
+        "desc": "Share of shots at the rim plus putback frequency, versus jump shots."
+      }
+    ],
+    "archetypes": [
+      {
+        "name": "Mid-Range Shot-Makers",
+        "desc": "Lives on 2-point jumpers instead of threes or the rim, and rarely draws fouls. Effective when the shooters are elite, but the shot diet is inefficient on average.",
+        "history": "Missouri State '17 & '20, Houston '25–'26, BYU '17, Southern Miss '20"
+      },
+      {
+        "name": "Isolation Creators",
+        "desc": "Low assist rate: guards create their own shots, take threes and get to the free-throw line.",
+        "history": "Maryland '15, UCF '17, High Point '24, UNC Wilmington '23, Towson '16–'17"
+      },
+      {
+        "name": "Grind & Crash",
+        "desc": "Slower, turnover-tolerant offense that makes up for it on the offensive glass and around the rim.",
+        "history": "Saint Mary's '15, Southern Illinois '21, Sacramento State '24, Tarleton State '25"
+      },
+      {
+        "name": "Inside-Out Motion",
+        "desc": "The most assist-heavy offense, fed through the post. It draws lots of fouls and gets easy looks from interior passing.",
+        "history": "Purdue '24 (Edey), Nevada '24–'25, Oregon State '26, Hawai'i '18"
+      },
+      {
+        "name": "Downhill Rim Attack",
+        "desc": "Gets to the rim relentlessly, at a quicker pace, and follows its misses with putbacks.",
+        "history": "Virginia Tech '16, Rhode Island '20, South Alabama '26, Campbell '26, Stephen F. Austin '21"
+      },
+      {
+        "name": "Run-and-Gun Bombers",
+        "desc": "Fast pace plus a heavy three-point diet: lots of possessions and lots of threes, with ball movement to find shooters.",
+        "history": "Savannah State '17–'19, The Citadel '18, William & Mary '25–'26, Cal Poly '25, Cornell '22"
+      },
+      {
+        "name": "Patient Precision",
+        "desc": "Slow, low-turnover half-court offense that works the clock for a good jump shot. Low variance, with few empty possessions.",
+        "history": "Virginia '19–'25, Liberty '20–'21, Siena '19"
+      }
+    ]
+  },
+  "defense": {
+    "factors": [
+      {
+        "name": "Zone Signature",
+        "low": "Denies passing lanes",
+        "high": "Concedes ball-movement looks",
+        "desc": "Share of opponents' baskets that are assisted. Zones give up passes and assisted shots; aggressive man defenses force one-on-one play. The clearest zone fingerprint (Syracuse, Baylor's matchup zone)."
+      },
+      {
+        "name": "Turnover Pressure",
+        "low": "Passive",
+        "high": "Disruptive",
+        "desc": "Turnovers forced (live-ball and backcourt/early), usually at the cost of giving up offensive rebounds and dunks."
+      },
+      {
+        "name": "Foul Tendency",
+        "low": "Disciplined",
+        "high": "Physical / foul-prone",
+        "desc": "Defensive fouls and opponent free-throw rate, including reach-in fouls early in the clock."
+      },
+      {
+        "name": "Transition Defense",
+        "low": "Gets back",
+        "high": "Leaky in transition",
+        "desc": "How often opponents get early-clock transition shots, after rebounds, makes or steals."
+      },
+      {
+        "name": "Rim vs. Arc",
+        "low": "Packs the paint, concedes 3s",
+        "high": "Runs shooters off, concedes the rim",
+        "desc": "Which shots the defense gives up: threes (pack-line style) or rim attempts (extended perimeter coverage)."
+      },
+      {
+        "name": "Clock Burn",
+        "low": "Quick-shot defense",
+        "high": "Makes opponents grind",
+        "desc": "Length of opponents' possessions and share of late-clock shots forced."
+      },
+      {
+        "name": "Mid-Range Funnel",
+        "low": "Allows rim & threes",
+        "high": "Funnels to mid-range",
+        "desc": "Share of opponent shots that are 2-point jumpers. Drop coverage and help-heavy schemes concede the mid-range to protect the rim and arc."
+      }
+    ],
+    "archetypes": [
+      {
+        "name": "Denial Man-to-Man",
+        "desc": "Pressures the ball and denies passes: forces turnovers, allows few assisted looks, and makes opponents work deep into the shot clock.",
+        "history": "VCU '19–'22 (Havoc), Virginia '16, Houston '26, Florida State '24, Northern Illinois '15"
+      },
+      {
+        "name": "Conservative Pack-Line",
+        "desc": "The most common defense. Sits back, protects the paint and concedes threes, forcing few turnovers and allowing few mid-range jumpers.",
+        "history": "Northeastern '15, William & Mary '20, Notre Dame '26, App State '25"
+      },
+      {
+        "name": "Zone",
+        "desc": "The unmistakable zone fingerprint: opponents' baskets are heavily assisted, with lots of passing around the perimeter.",
+        "history": "Syracuse '16–'23, Baylor '16 (matchup zone), Eastern Michigan '19, Merrimack '23"
+      },
+      {
+        "name": "Contain, Don't Foul",
+        "desc": "Disciplined and low-foul, but it gives up transition chances and doesn't force turnovers.",
+        "history": "Villanova '17, Toledo '19, Southern Utah '25–'26, North Florida '18–'19"
+      },
+      {
+        "name": "Full-Court Chaos",
+        "desc": "Pressure everywhere: forces lots of turnovers and fouls, and speeds opponents up.",
+        "history": "West Virginia '15–'18 (Press Virginia), Stephen F. Austin '15–'18, Abilene Christian '22"
+      },
+      {
+        "name": "Drop & Funnel",
+        "desc": "Takes away the rim and the 3-point line and concedes 2-point jumpers. A classic drop-coverage profile.",
+        "history": "San Diego '16–'19, Missouri State '18–'20, Illinois '22, Seattle U '18"
+      }
+    ]
+  },
+  "roster": {
+    "factors": [
+      {
+        "name": "Rotation Depth",
+        "low": "Tight rotation",
+        "high": "Deep platoon",
+        "desc": "Effective rotation size, bench minutes and how spread minutes are across lineups."
+      },
+      {
+        "name": "Who Drives It",
+        "low": "Forward-driven",
+        "high": "Guard-driven",
+        "desc": "Share of usage and rebounding by guards versus forwards and centers."
+      },
+      {
+        "name": "Big-Man Type",
+        "low": "Wings & stretch bigs",
+        "high": "Traditional bigs",
+        "desc": "Minutes to back-to-the-basket centers and power forwards, versus wings and stretch-4s who shoot threes."
+      },
+      {
+        "name": "Frontcourt Size",
+        "low": "Undersized",
+        "high": "Towering",
+        "desc": "Height of the main frontcourt players and of the rotation overall."
+      },
+      {
+        "name": "Star Usage",
+        "low": "Balanced scoring",
+        "high": "One-man show",
+        "desc": "How concentrated usage is in the top player."
+      }
+    ],
+    "archetypes": [
+      {
+        "name": "Towering Frontcourt",
+        "desc": "Exceptional size up front, with a big height gap between the frontcourt and the guards.",
+        "history": "Western Kentucky '22–'23, Loyola Marymount '19, Seattle U '18, Youngstown State '25"
+      },
+      {
+        "name": "Small-Ball Guards",
+        "desc": "Guards carry the usage and the rebounding; undersized, with wings instead of traditional bigs.",
+        "history": "American '15, UMass Lowell '18, Tarleton State '22, Pittsburgh '26"
+      },
+      {
+        "name": "Deep Platoon",
+        "desc": "Long benches and lots of lineup variety, with no single focal point.",
+        "history": "Troy '22, Bucknell '15, West Virginia '20, Georgia '26"
+      },
+      {
+        "name": "Forward-Led Positionless",
+        "desc": "Forwards run the offense; skilled, versatile bigs and wings with few traditional centers.",
+        "history": "Stanford '22, Butler '25, Nevada '18–'19, Penn '16"
+      },
+      {
+        "name": "Star System",
+        "desc": "Offense funneled through one high-usage player.",
+        "history": "Detroit Mercy '23 (Antoine Davis), UNC Greensboro '21, Eastern Washington '17, Fairfield '18"
+      },
+      {
+        "name": "Traditional Two-Big",
+        "desc": "Old-school frontcourt: back-to-the-basket bigs who rarely shoot threes.",
+        "history": "McNeese '18, California Baptist '24, Boston College '22, Drexel '16"
+      }
+    ]
+  }
+}
