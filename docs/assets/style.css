@@ -289,6 +289,7 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .ff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; align-items: center; max-width: 840px; }
 .champ-card { text-align: center; }
 .champ-card .logo { width: 72px; height: 72px; }
+.lb-row { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 110px) 48px !important; }
 .odds-row { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 54px; gap: 10px; align-items: center; padding: 4px 0; }
 
 /* ------------------------------------------------------------------ styles map & guide */
@@ -360,4 +361,6 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
   .odds-row { grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 50px; }
   .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .games { grid-template-columns: minmax(0, 1fr); }
+  .lb-row { grid-template-columns: 22px minmax(0, 1fr) 48px !important; }
+  .lb-bar { display: none; }
 }

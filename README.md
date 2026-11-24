@@ -20,7 +20,7 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
 | **Final game model** | both | Margin blend of the two, weight chosen by the backtest |
 | Team identities: factor analysis + archetypes + identity cards | mmkm | Descriptive; style adds ~nothing to March predictions |
 | Bracket: exact advancement odds, 76-team format, pods, actual bracket from ESPN | mmai + mmkm | Pool-optimal and most-likely picks with expected points |
-| Front end | both | Ratings, team pages, Matchup Lab, Games, Bracket, Styles, Method |
+| Front end | both | Ratings, Players, team pages, Matchup Lab, Games, Bracket, Styles, Method |
 
 ## What changed in the merge
 
@@ -38,6 +38,16 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
   rows of mmai's training table and corrupted its form feature.
 * **One backtest for every model.** Season-ahead (train on earlier seasons only), the same games for every
   model, and ESPN's pre-game line as a yardstick wherever it exists (`artifacts/backtest.json`).
+
+## Ratings and players
+
+* **Power**: points per 100 possessions better than an average D-I team on a neutral floor (0 = average), from the
+  final game model's round-robin against top-100-calibre opposition. **SOS** is the average Power of the opponents
+  faced, so 0 is an average D-I schedule.
+* **Players** (`docs/data/players.json`): every D-I player this season. **Value** is the de-leaked, prior-shrunk box
+  plus/minus (points per 100 possessions vs an average D-I player). **Impact** = minutes share × (value −
+  replacement), i.e. what he adds to his team's rating. Each player also gets availability, ESPN per-game box stats
+  and Torvik's advanced rates. The site defaults to rotation players (3+ games, 15+ mpg) and can show everyone.
 
 ## Backtest
 

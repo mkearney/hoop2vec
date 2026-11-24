@@ -130,7 +130,8 @@ REF_GROUP = 100  # power = margin per 100 possessions vs the top-N teams (tourna
 def power_ratings(bundle, state: pd.DataFrame) -> pd.DataFrame:
     """Round-robin through the final (blended) game model on a neutral floor.
 
-    power = average predicted margin **per 100 possessions** against the top ``REF_GROUP`` teams.
+    power_net = average predicted margin **per 100 possessions** against the top ``REF_GROUP`` teams;
+    power = power_net re-centered on the D-I average (0 = average team), so SOS and Power read naturally.
     Per-possession keeps it tempo-neutral (fast teams' point margins are not inflated); the
     strong reference group measures what matters in March instead of how badly a team
     beats the weakest D-I teams.
@@ -160,7 +161,9 @@ def power_ratings(bundle, state: pd.DataFrame) -> pd.DataFrame:
     out["power_net"] = (M100 * mask).sum(1) / mask.sum(1)
     out["power_all"] = vs_all
     # Power = the final game model's own view (what the forecasts and the bracket use)
-    out["power"] = out["power_net"]
+    # Re-centered so 0 = an average D-I team: the margin vs a top-100 opponent minus the D-I average of that
+    # same quantity. Gaps between teams (and every forecast) are unchanged; ranks are identical.
+    out["power"] = out["power_net"] - out["power_net"].mean()
     out["win_vs_avg"] = P.sum(1) / (n - 1)
     top = np.argsort(-out["power"].to_numpy())[:25]
     out["win_vs_top25"] = P[:, top].mean(1)

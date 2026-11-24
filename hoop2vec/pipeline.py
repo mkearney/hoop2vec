@@ -308,6 +308,9 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     log("team pages")
     write_team_pages(st, snaps, season, live, pg, inj_report, gcur, feat, bundle, up)
 
+    log("players")
+    write_players(st, live, pg, inj_report, season)
+
     log("bracket")
     write_json("bracket.json", make_bracket(bundle, st, power, games, meta, season))
 
@@ -399,6 +402,91 @@ def venue_list():
             site = BR._site(s)
             v.append({"group": name, "city": site["city"], "lat": _clean(site["lat"]), "lon": _clean(site["lon"])})
     return v
+
+
+def _espn_box(season, st) -> pd.DataFrame:
+    """This season's ESPN box-score totals per player (play-by-play ingest), keyed by (team, normalized name)."""
+    from .ingest import season_dir
+    from .sources.injuries import norm_name
+    f = season_dir(season) / "player_games.parquet"
+    if not f.exists():
+        return pd.DataFrame()
+    b = pd.read_parquet(f)
+    b = b[(b["min"] > 0) & ~b["dnp"].fillna(False).astype(bool)].copy()
+    id2team = {str(e): t for t, e in st["espn_id"].items() if isinstance(e, str)}
+    b["team"] = b["team_id"].astype(str).map(id2team)
+    b = b[b["team"].notna()]
+    b["reb"] = b["oreb"] + b["dreb"]
+    agg = b.groupby(["team", "athlete_id"]).agg(
+        name=("name", "last"), pos=("pos", "last"), g=("game_id", "nunique"), gs=("starter", "sum"), min=("min", "sum"),
+        **{c: (c, "sum") for c in ("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga",
+                                   "tpm", "tpa", "ftm", "fta")}).reset_index()
+    agg["nk"] = agg["name"].map(norm_name)
+    return agg
+
+
+def write_players(st, live, pg, inj_report, season):
+    """players.json: every D-I player this season. Model value/impact/availability + ESPN per-game box stats +
+    Torvik's advanced rates. Value is the de-leaked, prior-shrunk box plus/minus (pts per 100 vs an average D-I
+    player); impact = minutes share x (value - replacement), i.e. what he adds to his team's rating per 100."""
+    from .sources.injuries import norm_name
+    names = pg[pg["season"] == season].drop_duplicates("pid", keep="last").set_index("pid")
+    ps = PL.load_player_seasons([season], refresh_current=False)
+    ps = ps.assign(pid=pd.to_numeric(ps["pid"], errors="coerce")).dropna(subset=["pid"])
+    ps = ps.drop_duplicates("pid", keep="last").set_index("pid")
+    box = _espn_box(season, st)
+    bidx = {}
+    if len(box):
+        for r in box.itertuples():
+            bidx[(r.team, r.nk)] = r
+        last = box.assign(ln=box["nk"].str.split().str[-1])
+        cnt = last.groupby(["team", "ln"])["nk"].transform("size")
+        by_last = {(t, ln): r for t, ln, c, r in zip(last["team"], last["ln"], cnt, last.itertuples()) if c == 1}
+    inj = {}
+    if len(inj_report):
+        for r in inj_report.dropna(subset=["pid"]).itertuples():
+            inj[(r.team, int(r.pid))] = f"{r.status} ({r.injury})" if getattr(r, "injury", "") else str(r.status)
+    num = lambda v: None if v is None or (isinstance(v, float) and not np.isfinite(v)) else v  # noqa: E731
+    rows = []
+    for team, lp in live.items():
+        if team not in st.index:
+            continue
+        for p in lp.itertuples():
+            if p.games <= 0 or p.minutes <= 0:
+                continue
+            pid = int(p.pid)
+            nm = names["player"].get(pid, str(pid))
+            nk = norm_name(nm)
+            b = bidx.get((team, nk)) or (by_last.get((team, nk.split()[-1])) if len(box) and nk else None)
+            t = ps.loc[pid] if pid in ps.index else None
+            tv = (lambda c: num(pd.to_numeric(t.get(c), errors="coerce")) if t is not None else None)
+            r = {"pid": pid, "name": nm, "team": team, "conf": st.at[team, "conf"], "cls": _clean(names["cls"].get(pid)),
+                 "ht": _clean(names["inches"].get(pid)), "pos": b.pos if b is not None else None,
+                 "role": (str(t.get("role")) if t is not None and isinstance(t.get("role"), str) else None),
+                 "rec": tv("rec_rank"), "g": int(p.games), "mpg": p.minutes / max(p.games, 1),
+                 "min_pct": 100 * p.share / 5, "value": p.value, "o": p.o_value, "d": p.d_value,
+                 "impact": p.share * (p.value - PL.V_REPL), "avail": p.avail, "status": inj.get((team, pid)),
+                 "usg": tv("usg"), "ortg": tv("ortg"), "ts": tv("ts"), "efg": tv("efg"), "ast_pct": tv("ast_pct"),
+                 "to_pct": tv("to_pct"), "orb_pct": tv("orb_pct"), "drb_pct": tv("drb_pct"), "blk_pct": tv("blk_pct"),
+                 "stl_pct": tv("stl_pct")}
+            if b is not None and b.g > 0:
+                g = b.g
+                r.update({"gs": int(b.gs), "ppg": b.pts / g, "rpg": b.reb / g, "apg": b.ast / g, "spg": b.stl / g,
+                          "bpg": b.blk / g, "tpg": b.tov / g, "tpm": b.tpm / g,
+                          "fg_pct": 100 * b.fgm / b.fga if b.fga else None, "tp_pct": 100 * b.tpm / b.tpa if b.tpa else None,
+                          "ft_pct": 100 * b.ftm / b.fta if b.fta else None,
+                          "ts_box": 100 * b.pts / (2 * (b.fga + 0.44 * b.fta)) if (b.fga + b.fta) else None})
+            rows.append(r)
+    df = pd.DataFrame(rows)
+    for c in ("value", "impact"):
+        df[f"{c}_rank"] = df[c].where((df["g"] >= 3) & (df["mpg"] >= 10)).rank(ascending=False, method="min")
+    df = df.sort_values("impact", ascending=False)
+    fl = [c for c in df.columns if df[c].dtype.kind == "f" and not c.endswith("_rank")]
+    df[fl] = df[fl].round(2)
+    write_json("players.json", {"season": season, "updated": utcnow(), "replacement": PL.V_REPL,
+                                "players": [{k: _clean(v) for k, v in rec.items() if _clean(v) is not None}
+                                            for rec in df.to_dict(orient="records")]})
+    log(f"  {len(df)} players")
 
 
 def write_team_pages(st, snaps, season, live, pg, inj_report, gcur, feat, bundle, up):

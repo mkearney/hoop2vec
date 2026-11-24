@@ -106,7 +106,7 @@
     root.dataset.theme = dark ? "light" : "dark";
     try { localStorage.setItem("hoop2vec-theme", root.dataset.theme); } catch (e) { /* ignore */ }
   });
-  const routes = { ratings: viewRatings, team: viewTeam, bracket: viewBracket, matchup: viewMatchup, games: viewGames,
+  const routes = { ratings: viewRatings, players: viewPlayers, team: viewTeam, bracket: viewBracket, matchup: viewMatchup, games: viewGames,
     styles: viewStyles, guide: viewGuide, method: viewMethod };
   const NAV = { team: "ratings", guide: "styles" };
   async function route() {
@@ -136,7 +136,7 @@
   // ================================================================ RATINGS
   const VIEWS = {
     core: [
-      ["power", "Power", 1, false, "Predicted margin per 100 possessions vs a top-100 team on a neutral floor (final game model)"],
+      ["power", "Power", 1, false, "Points per 100 possessions better than an average D-I team on a neutral floor (final game model; 0 = average)"],
       ["k_em", "Dynamic", 1, false, "Game-by-game Kalman rating: offense − defense, pts / 100 possessions", true],
       ["eff_o", "AdjO", 1, false, "Adjusted offensive efficiency (pts / 100 poss)"],
       ["eff_d", "AdjD", 1, true, "Adjusted defensive efficiency (lower is better)"],
@@ -144,7 +144,7 @@
       ["adjt", "Tempo", 1, null, "Adjusted possessions / 40 min", true],
       ["roster", "Roster", 1, false, "Player-based strength: Σ minutes share × player value", true],
       ["injury_pts", "Inj", 1, false, "Availability adjustment in points (injuries / absences)"],
-      ["sos", "SOS", 1, false, "Average power of opponents faced", true],
+      ["sos", "SOS", 1, false, "Average Power of opponents faced (0 = average D-I schedule)", true],
     ],
     offense: [
       ["efg_o", "eFG%", 1, false], ["tov_o", "TO%", 1, true], ["orb_o", "OR%", 1, false], ["ftr_o", "FTR", 1, false],
@@ -172,7 +172,7 @@
     app.innerHTML = `
       <div class="page-head"><div>
         <h1>Power Ratings</h1>
-        <p class="sub">${r.season - 1}–${String(r.season).slice(2)} · ${r.teams.length} teams · updated ${esc(r.updated)}. <b>Power</b> is each team's predicted margin per 100 possessions against a top-100 opponent on a neutral floor, from the final game model: a matchup network blended with a dynamic-rating linear model, checked for leakage against betting lines.</p>
+        <p class="sub">${r.season - 1}–${String(r.season).slice(2)} · ${r.teams.length} teams · updated ${esc(r.updated)}. <b>Power</b> is how many points per 100 possessions a team would beat an average D-I team by on a neutral floor (0 = average), from the final game model: a matchup network blended with a dynamic-rating linear model, checked for leakage against betting lines.</p>
       </div></div>
       <div class="controls">
         <input type="search" id="q" placeholder="Search teams…" value="${esc(R.q)}" style="width:220px" aria-label="Search teams">
@@ -240,6 +240,109 @@
     }));
   }
 
+
+  // ================================================================ PLAYERS
+  const PCOLS = {
+    overview: [["impact", "Impact", 1, "Team points per 100 possessions he adds over a replacement-level player (value above replacement × minutes share)"],
+      ["value", "Value", 1, "Points per 100 possessions vs an average D-I player when on the floor: de-leaked box plus/minus, shrunk toward a prior"],
+      ["o", "Off", 1, "Offensive part of Value"], ["d", "Def", 1, "Defensive part of Value"], ["mpg", "MPG", 1, "Minutes per game"],
+      ["ppg", "PPG", 1, "Points per game (ESPN box scores)"], ["rpg", "RPG", 1], ["apg", "APG", 1], ["usg", "Usg%", 1, "Usage rate (Torvik)"],
+      ["ts", "TS%", 1, "True shooting (Torvik)"], ["avail", "Avail", 0, "Chance he plays next game"]],
+    scoring: [["ppg", "PPG", 1], ["fg_pct", "FG%", 1], ["tpm", "3PM", 1, "Threes made per game"], ["tp_pct", "3P%", 1], ["ft_pct", "FT%", 1],
+      ["ts", "TS%", 1, "True shooting (Torvik)"], ["efg", "eFG%", 1, "Effective FG% (Torvik)"], ["usg", "Usg%", 1], ["ortg", "ORtg", 1, "Points produced per 100 possessions used (Torvik)"]],
+    playmaking: [["apg", "APG", 1], ["tpg", "TOPG", 1, "Turnovers per game"], ["ast_pct", "Ast%", 1, "Assist rate (Torvik)"], ["to_pct", "TO%", 1, "Turnover rate (Torvik)", true],
+      ["rpg", "RPG", 1], ["orb_pct", "OR%", 1], ["drb_pct", "DR%", 1], ["spg", "SPG", 1], ["bpg", "BPG", 1], ["stl_pct", "Stl%", 1], ["blk_pct", "Blk%", 1]],
+    profile: [["cls", "Yr", null], ["ht", "Ht", null], ["pos", "Pos", null], ["role", "Role", null, "Torvik role"], ["rec", "Recruit", 1, "Recruiting score (Torvik, 0–100)"],
+      ["g", "G", 0], ["gs", "GS", 0, "Games started"], ["mpg", "MPG", 1], ["min_pct", "Min%", 1, "Share of team minutes"]],
+  };
+  const PF = { sort: "impact", dir: -1, view: "overview", conf: "", team: "", q: "", pool: "rotation", limit: 100 };
+  const POOLS = [["stars", "Starters (25+ mpg)"], ["rotation", "Rotation (15+ mpg)"], ["regulars", "Regulars (8+ mpg)"], ["all", "Everyone"]];
+  const inPool = (p) => PF.pool === "all" ? true : p.g >= 3 && p.mpg >= ({ stars: 25, rotation: 15, regulars: 8 }[PF.pool]);
+  const htFmt = (h) => (isNum(h) && h > 0 ? `${Math.floor(h / 12)}'${Math.round(h % 12)}"` : "");
+
+  async function viewPlayers(_, params) {
+    const [d] = await Promise.all([get("players.json"), teams()]);
+    if (params.get("team")) { PF.team = params.get("team"); PF.pool = "all"; }
+    const P = d.players;
+    const confs = [...new Set(P.map((p) => p.conf).filter(Boolean))].sort();
+    const tnames = [...new Set(P.map((p) => p.team))].sort();
+    const qual = P.filter((p) => p.g >= 3 && p.mpg >= 15);
+    const board = (key, title, note) => {
+      const top = qual.slice().sort((a, b) => b[key] - a[key]).slice(0, 10);
+      const mx = Math.max(...top.map((p) => p[key]));
+      return `<div class="card"><h2>${title}</h2><p class="note" style="margin-top:-4px">${note}</p>${top.map((p, i) => `
+        <div class="odds-row lb-row"><span class="faint num">${i + 1}</span>
+          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm"><b>${esc(p.name)}</b> <span class="faint small">${esc(p.team)}</span></span></span>
+          <div class="pbar lb-bar"><span style="width:${(100 * Math.max(0, p[key]) / mx).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${sgn(p[key])}</div></div>`).join("")}</div>`;
+    };
+    app.innerHTML = `
+      <div class="page-head"><div><h1>Players</h1>
+        <p class="sub">${P.length.toLocaleString()} D-I players this season · updated ${esc(d.updated)}. <b>Value</b> is a player's points per 100 possessions vs an average D-I player when he's on the floor: box-score plus/minus, re-based on pre-game opponent and team strength so it can't see the future, and shrunk toward a prior (last season, class, recruiting) until minutes pile up. <b>Impact</b> also weighs how much he plays. It's what he adds to his team's rating over a replacement-level player (value ${d.replacement}).</p></div></div>
+      <div class="grid g2">${board("value", "Best players", "Highest Value, 15+ minutes per game")}${board("impact", "Most important players", "Highest Impact: quality × minutes")}</div>
+      <div class="section controls">
+        <input type="search" id="pq" placeholder="Search players or teams…" value="${esc(PF.q)}" style="width:230px" aria-label="Search players">
+        <select id="pconf" aria-label="Conference"><option value="">All conferences</option>${confs.map((c) => `<option ${c === PF.conf ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+        <select id="pteam" aria-label="Team"><option value="">All teams</option>${tnames.map((c) => `<option ${c === PF.team ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+        <select id="ppool" aria-label="Minutes cutoff">${POOLS.map(([v, l]) => `<option value="${v}" ${v === PF.pool ? "selected" : ""}>${l}</option>`).join("")}</select>
+        ${seg("pview", [["overview", "Overview"], ["scoring", "Scoring"], ["playmaking", "Playmaking & D"], ["profile", "Profile"]], PF.view)}
+      </div>
+      <div class="card flush tbl-wrap"><table id="ptbl" class="ratings-table"></table></div>
+      <div id="pmore" style="margin-top:10px"></div>
+      <p class="note">Per-game stats come from ESPN box scores; rates (usage, TS%, assist/turnover/rebound/block/steal rates, ORtg) from barttorvik.com. Shading is a percentile among players in the current filter. ✚ = on an injury report.</p>`;
+    const redraw = () => { PF.limit = 100; drawPlayers(P); };
+    $("#pq").addEventListener("input", (e) => { PF.q = e.target.value; redraw(); });
+    $("#pconf").addEventListener("change", (e) => { PF.conf = e.target.value; redraw(); });
+    $("#pteam").addEventListener("change", (e) => { PF.team = e.target.value; if (PF.team && PF.pool !== "all") { PF.pool = "all"; $("#ppool").value = "all"; } redraw(); });
+    $("#ppool").addEventListener("change", (e) => { PF.pool = e.target.value; redraw(); });
+    onSeg("pview", (v) => { PF.view = v; redraw(); });
+    drawPlayers(P);
+  }
+
+  function drawPlayers(P) {
+    const cols = PCOLS[PF.view];
+    const q = PF.q.toLowerCase();
+    let rows = P.filter((p) => inPool(p) && (!PF.conf || p.conf === PF.conf) && (!PF.team || p.team === PF.team)
+      && (!q || p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)));
+    const dist = {};
+    cols.forEach(([k]) => (dist[k] = rows.map((p) => p[k]).filter(isNum)));
+    const k = PF.sort, dr = PF.dir;
+    rows.sort((a, b) => {
+      const x = a[k], y = b[k];
+      if (typeof x === "string" || typeof y === "string") return dr * String(x ?? "~").localeCompare(String(y ?? "~"));
+      return dr * ((x ?? -1e9) - (y ?? -1e9));
+    });
+    const n = rows.length;
+    const shown = rows.slice(0, PF.limit);
+    const th = (key, label, cls = "", title = "") => `<th data-k="${key}" class="${cls} ${k === key ? "sorted" : ""}" title="${esc(title)}" scope="col">${label}${k === key ? (dr > 0 ? " ↑" : " ↓") : ""}</th>`;
+    const head = `<thead><tr><th class="rankcol nosort">#</th>${th("name", "Player", "l")}${th("team", "Team", "l")}${cols.map(([c, l, , t, inv]) => th(c, l, "", t || "")).join("")}</tr></thead>`;
+    const body = shown.map((p, i) => {
+      const cells = cols.map(([c, , dg, , inv]) => {
+        const v = p[c];
+        if (c === "ht") return `<td class="faint">${htFmt(v)}</td>`;
+        if (dg === null) return `<td class="faint">${esc(v ?? "")}</td>`;
+        if (c === "avail") return `<td class="num ${isNum(v) && v < 0.5 ? "neg" : "faint"}">${isNum(v) ? pct(v) : ""}</td>`;
+        const txt = ["impact", "value", "o", "d"].includes(c) ? sgn(v, dg) : fmt(v, dg);
+        return `<td><span class="heat num" style="${heat(pctRank(dist[c], v), inv === true)}">${isNum(v) ? txt : "–"}</span></td>`;
+      }).join("");
+      return `<tr><td class="rankcol">${i + 1}</td><td class="l"><b>${esc(p.name)}</b>${p.status ? ` <span class="pill bad" title="${esc(p.status)}">✚</span>` : ""}<div class="small faint">${esc([p.cls, htFmt(p.ht), p.pos].filter(Boolean).join(" · "))}</div></td>
+        <td class="l">${teamLink(p.team)}</td>${cells}</tr>`;
+    }).join("");
+    const tbl = $("#ptbl");
+    tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="${cols.length + 3}" class="l faint">No players match.</td></tr>`}</tbody>`;
+    $$("th[data-k]", tbl).forEach((h) => h.addEventListener("click", () => {
+      const key = h.dataset.k;
+      if (PF.sort === key) PF.dir *= -1;
+      else { PF.sort = key; const spec = cols.find((c) => c[0] === key); PF.dir = key === "name" || key === "team" || (spec && (spec[2] === null || spec[4] === true)) ? 1 : -1; }
+      drawPlayers(P);
+    }));
+    $("#pmore").innerHTML = n > shown.length ? `<span class="small muted">Showing ${shown.length} of ${n.toLocaleString()} players.</span> <button class="chip" id="pm1">Show 200 more</button> <button class="chip" id="pm2">Show all</button>`
+      : `<span class="small muted">${n.toLocaleString()} players.</span>`;
+    if (n > shown.length) {
+      $("#pm1").addEventListener("click", () => { PF.limit += 200; drawPlayers(P); });
+      $("#pm2").addEventListener("click", () => { PF.limit = n; drawPlayers(P); });
+    }
+  }
+
   // ================================================================ TEAM
   function lineChart(el, pts, color, label) {
     if (pts.length < 2) { el.innerHTML = `<p class="faint small">Not enough games yet.</p>`; return; }
@@ -305,7 +408,7 @@
     const injChip = availChip(t);
     const stat = (k, v, r) => `<div class="tile"><span class="k">${k}</span><span class="v num">${v}</span><span class="r">${r}</span></div>`;
     const tiles = [
-      stat("Power", sgn(t.power), `#${t.rank} · per 100 vs top-100`), stat("Adj. offense", fmt(t.eff_o), `#${t.eff_o_rank}`),
+      stat("Power", sgn(t.power), `#${t.rank} · per 100 vs avg D-I`), stat("Adj. offense", fmt(t.eff_o), `#${t.eff_o_rank}`),
       stat("Adj. defense", fmt(t.eff_d), `#${t.eff_d_rank}`), stat("Tempo", fmt(t.adjt), `#${t.adjt_rank}`),
       stat("Dynamic rating", sgn(t.k_em), `#${t.k_em_rank} · ±${fmt(t.k_sd)}`), stat("Roster strength", fmt(t.roster), `#${t.roster_rank}`),
       stat("Win vs avg team", pct(t.win_vs_avg), "neutral floor"), stat("Win vs top 25", pct(t.win_vs_top25), "neutral floor"),
@@ -376,7 +479,7 @@
       </div>
       ${styleHtml}
       <div class="section grid g2 top">
-        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability</h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average D-I player (box score + prior). Avail = chance he plays next game (injury reports, recent missed games).</p></div>
+        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability <a class="small" style="font-weight:500" href="#/players?team=${encodeURIComponent(name)}">all stats →</a></h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average D-I player (box score + prior). Avail = chance he plays next game (injury reports, recent missed games).</p></div>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Yr</th><th class="nosort hide-sm">Ht</th><th class="nosort">MPG</th><th class="nosort">Value</th><th class="nosort hide-sm">Off</th><th class="nosort hide-sm">Def</th><th class="nosort">Avail</th></tr></thead><tbody>${roster}</tbody></table></div></div>
         <div class="card flush"><div style="padding:16px 20px 6px"><h2>Schedule</h2></div>
           <div class="tbl-wrap"><table><tbody>${sched}</tbody></table></div></div>
@@ -832,7 +935,7 @@
       <li>the <b>linear game model</b> (from mmkm): a regularized antisymmetric regression on the Kalman margin, the snapshot AdjEM margin, home court, travel (log-miles difference), rest and availability, with σ scaling with expected possessions.</li></ul>
       <p>Margins blend as <code>w·network + (1−w)·linear</code> with mixture variance, and P(win) = Φ(margin/σ). The Matchup Lab shows the decomposition. mmkm's research found PBP style factors add only ~0.001 log loss on all games and nothing measurable in March. So identities stay descriptive, and the network's box-score style inputs carry the matchup effects.</p>
       <h2>6 · Power ratings</h2>
-      <p>Power is the blended model's round-robin on a neutral floor: each team's average predicted margin <b>per 100 possessions against the top-100 teams</b>. It's tempo-neutral and measured against tournament-calibre opposition rather than how badly a team beats the weakest D-I teams.</p>
+      <p>Power is the blended model's round-robin on a neutral floor: each team's average predicted margin <b>per 100 possessions against the top-100 teams</b>, re-centered so 0 = an average D-I team. It's tempo-neutral and measured against tournament-calibre opposition, not by how badly a team beats the weakest D-I teams. Re-centering shifts every team equally, so ranks, gaps between teams and forecasts don't change. Strength of schedule is the average Power of the opponents faced, so 0 is an average D-I schedule.</p>
       <h2>7 · Bracket</h2>
       <p>2027 uses the <b>76-team</b> format with a 12-game Opening Round. Before Selection Sunday the field is projected: conference champions (or the best team in each conference), the best at-larges, S-curve seeding, protected seeds at the nearest first-round site. Afterwards it is read from ESPN automatically, or from <code>overrides/bracket_2027.yaml</code>. Advancement odds are exact, from propagating each game's win probability (with venue-specific travel) through the tree. Picks: pool-optimal and most likely.</p>
       <h2>Refresh</h2>
