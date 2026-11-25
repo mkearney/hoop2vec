@@ -235,7 +235,11 @@ ul.clean li.empty::before { content: ""; }
 .g-team a { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-team b { text-align: right; }
 .g-team.fav a { font-weight: 700; }
-.g-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
+.g-meta .ellip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.g-meta .pill { flex: none; }
+.game.featured { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
 .g-foot { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 h2.day { margin: 22px 0 10px; font-size: 16px; }
 .res-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 64px minmax(0, 1fr) 92px; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }

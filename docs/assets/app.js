@@ -999,12 +999,18 @@
     const byDate = {};
     g.upcoming.forEach((x) => (byDate[x.date] = byDate[x.date] || []).push(x));
     const acc = g.season_accuracy;
+    // Featured: both teams in the league's top tier (top 25 in college, the top third in the pros).
+    const nTeams = Object.keys(T).length;
+    const topN = nTeams > 100 ? 25 : Math.round(nTeams / 3);
+    const rk = (n) => (T[n] || {}).rank || 999;
+    const featured = (x) => rk(x.team_a) <= topN && rk(x.team_b) <= topN;
     const card = (x) => {
       const ta = T[x.team_a], tb = T[x.team_b];
+      const feat = featured(x);
       const favA = x.p_a >= 0.5;
       const edgeT = x.edge > 0 ? x.team_a : x.team_b;
       const site = x.loc === 0 ? `neutral${x.city ? " · " + esc(x.city) : ""}` : `at ${esc(x.loc > 0 ? x.team_a : x.team_b)}`;
-      return `<div class="game"><div class="g-meta small faint">${site}</div>
+      return `<div class="game${feat ? " featured" : ""}"><div class="g-meta small faint"><span class="ellip">${site}</span>${feat ? `<span class="pill acc" title="Both teams are in the top ${topN} by Power">Top ${topN} matchup</span>` : ""}</div>
         <div class="g-team ${favA ? "fav" : ""}">${logo(ta)}<a href="#/team/${slugify(x.team_a)}">${esc(x.team_a)}</a><span class="faint small">#${ta ? ta.rank : "–"}</span><b class="num">${fmt(x.pts_a, 0)}</b></div>
         <div class="g-team ${favA ? "" : "fav"}">${logo(tb)}<a href="#/team/${slugify(x.team_b)}">${esc(x.team_b)}</a><span class="faint small">#${tb ? tb.rank : "–"}</span><b class="num">${fmt(x.pts_b, 0)}</b></div>
         <div class="prob" role="img" aria-label="${esc(x.team_a)} ${pct(x.p_a)}"><i style="width:${x.p_a * 100}%"></i><i style="width:${(1 - x.p_a) * 100}%"></i></div>
@@ -1034,8 +1040,9 @@
       const q = ($("#gq").value || "").toLowerCase();
       $("#up").innerHTML = Object.entries(byDate).map(([d, xs]) => {
         const ys = xs.filter((x) => !q || x.team_a.toLowerCase().includes(q) || x.team_b.toLowerCase().includes(q))
-          .sort((a, b) => ((T[a.team_a] || {}).rank || 999) + ((T[a.team_b] || {}).rank || 999) - ((T[b.team_a] || {}).rank || 999) - ((T[b.team_b] || {}).rank || 999));
-        return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
+          .sort((a, b) => (featured(b) - featured(a)) || (rk(a.team_a) + rk(a.team_b) - rk(b.team_a) - rk(b.team_b)));
+        const nf = ys.filter(featured).length;
+        return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games${nf ? ` · ${nf} featured` : ""}</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
       }).join("") || `<p class="faint">No ${LG} games scheduled in the next week${q ? " for that filter" : ""}.</p>`;
     };
     $("#gq").addEventListener("input", draw);
