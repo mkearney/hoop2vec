@@ -38,7 +38,7 @@ LEAGUES = {
 
 def league_page(league: str) -> str:
     L = LEAGUES[league]
-    title = f"hoop2vec — {L['name']} College Basketball Ratings, Prospects &amp; Bracket"
+    title = f"hoop2vec: {L['name']} College Basketball Ratings and Forecasts"
     desc = (f"Daily {L['name'].lower()} college basketball power ratings, player values, {L['pro']} prospects, team style identities "
             "and the 2027 NCAA bracket, from leak-free models built on free public data.")
     return HEAD.format(title=title, desc=desc, css="../assets/style.css", icon=ICON) + f'''<body data-league="{league}">
@@ -80,19 +80,19 @@ def chooser_page() -> str:
       <a class="choice card" href="{lg}/" data-league="{lg}">
         <span class="kind">{LEAGUES[lg]['name']} college basketball</span>
         <span class="big">{LEAGUES[lg]['name']}</span>
-        <span class="muted small">Power ratings, players, {LEAGUES[lg]['pro']} prospects, Matchup Lab, games, the 2027 bracket and team identities.</span>
+        <span class="muted small">Ratings, players, {LEAGUES[lg]['pro']} prospects, game forecasts, the 2027 bracket and team styles.</span>
         <span class="top5" id="top-{lg}"></span>
         <span class="go">Open {LEAGUES[lg]['name'].lower()} →</span>
       </a>''' for lg in ("mens", "womens"))
-    return HEAD.format(title="hoop2vec — College Basketball Ratings, Prospects &amp; Bracket",
-                       desc="Daily men's and women's college basketball power ratings, player values, pro prospects, team identities and the 2027 NCAA brackets, from leak-free models on free public data.",
+    return HEAD.format(title="hoop2vec: College Basketball Ratings and Forecasts",
+                       desc="Daily ratings, game forecasts, player values and pro prospects for men's and women's college basketball, plus the 2027 NCAA tournaments. Built on free public data.",
                        css="assets/style.css", icon=ICON) + f'''<body class="chooser">
   <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./">{BALL}<span>hoop2vec</span></a>
     <div class="top-right" style="margin-left:auto">{THEME_BTN}</div></div></header>
   <main class="wrap">
     <section class="choose-hero">
-      <h1>College basketball, modeled honestly</h1>
-      <p class="sub">Daily power ratings, game forecasts, player values, pro prospects, team style identities and the 2027 NCAA tournament, for the men's and women's game. Every number is computed point-in-time and checked against what actually happened.</p>
+      <h1>College basketball ratings and forecasts</h1>
+      <p class="sub">Every Division I team gets a new rating each morning, men's and women's. The same models forecast games, value players, rank pro prospects and price out the 2027 NCAA tournament. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">{cards}
     </section>
