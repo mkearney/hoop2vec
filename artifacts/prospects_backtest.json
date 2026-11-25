@@ -868,5 +868,64 @@
     }
    ]
   }
+ },
+ "comps": {
+  "translation_r2": {
+   "usg_pct": 0.2942,
+   "ts_pct": 0.264,
+   "tpar": 0.6,
+   "ftr": 0.4819,
+   "orb_pct": 0.7558,
+   "drb_pct": 0.6851,
+   "ast_pct": 0.5993,
+   "stl_pct": 0.4881,
+   "blk_pct": 0.7451,
+   "tov_pct": 0.3539,
+   "bpm": 0.2143
+  },
+  "learned": {
+   "usg_pct": 0.1702,
+   "ts_pct": 0.1631,
+   "tpar": 0.4649,
+   "ftr": 0.3729,
+   "orb_pct": 0.692,
+   "drb_pct": 0.6064,
+   "ast_pct": 0.5358,
+   "stl_pct": 0.3251,
+   "blk_pct": 0.6798,
+   "tov_pct": 0.2084,
+   "bpm": 0.1337
+  },
+  "raw": {
+   "usg_pct": 0.1189,
+   "ts_pct": 0.0591,
+   "tpar": 0.4035,
+   "ftr": 0.3174,
+   "orb_pct": 0.6193,
+   "drb_pct": 0.5972,
+   "ast_pct": 0.4914,
+   "stl_pct": 0.2998,
+   "blk_pct": 0.6449,
+   "tov_pct": 0.2004,
+   "bpm": 0.0665
+  },
+  "n_players": 628,
+  "classes": [
+   2013,
+   2025
+  ],
+  "labels": {
+   "usg_pct": "Usage",
+   "ts_pct": "True shooting",
+   "tpar": "3PA rate",
+   "ftr": "FT rate",
+   "orb_pct": "Off. reb%",
+   "drb_pct": "Def. reb%",
+   "ast_pct": "Assist%",
+   "stl_pct": "Steal%",
+   "blk_pct": "Block%",
+   "tov_pct": "Turnover%",
+   "bpm": "BPM"
+  }
  }
 }

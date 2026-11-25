@@ -352,12 +352,34 @@
       ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1]],
     success: [["p_success", "NBA success", "pct", "P(8+ Win Shares in his first 4 NBA seasons): an established rotation player"],
       ["p_star", "Star start", "pct", "P(20+ Win Shares in his first 4 NBA seasons)"], ["exp_ws", "Exp. WS", 1, "Expected Win Shares, first 4 NBA seasons"],
-      ["p30", "1st round", "pct"], ["comps", "Statistical comps (pick → 4-yr WS)", "comps", "Most similar drafted college players since 2009"]],
+      ["p30", "1st round", "pct"], ["rate", "Comp hit rate", "rate", "Of the 25 most similar finished college careers at the same stage: share that became NBA rotation players"],
+      ["college", "Closest NBA comps", "comps", "College players with the most similar projected NBA profile at the same stage (click a row for details)"]],
     stats: [["mpg", "MPG", 1], ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1], ["stl", "STL", 1], ["blk", "BLK", 1],
       ["bpm", "BPM", 1], ["obpm", "OBPM", 1], ["dbpm", "DBPM", 1], ["usg", "Usg%", 1], ["ts", "TS%", 1], ["ast_pct", "Ast%", 1],
       ["to_pct", "TO%", 1, "", true], ["blk_pct", "Blk%", 1], ["stl_pct", "Stl%", 1], ["tp_pct", "3P%", 1], ["tpa", "3PA", 1], ["rec", "Recruit", 1]],
   };
   const XF = { sort: "board", dir: 1, view: "draft", q: "", cls: "", conf: "", limit: 60 };
+  const XOPEN = new Set();
+  const NBA_DIM = [["usg_pct", "Usage"], ["ts_pct", "True shooting"], ["tpar", "3PA rate"], ["ftr", "FT rate"], ["ast_pct", "Assist%"],
+    ["tov_pct", "Turnover%"], ["orb_pct", "Off. reb%"], ["drb_pct", "Def. reb%"], ["stl_pct", "Steal%"], ["blk_pct", "Block%"], ["bpm", "BPM"]];
+  const statLine = (l) => !l ? "" : `${fmt(l.pts)} pts · ${fmt(l.trb)} reb · ${fmt(l.ast)} ast${isNum(l.fg3_pct) && l.fg3a >= 0.5 ? ` · ${(100 * l.fg3_pct).toFixed(0)}% 3P` : ""}`;
+  function prospectDetail(p) {
+    const prof = NBA_DIM.map(([k, lab]) => {
+      const v = p.proj_pct ? p.proj_pct[k] : null;
+      return `<div class="profile-row" style="grid-template-columns:110px minmax(0,1fr) 40px"><span class="lab">${lab}</span><div class="pct-track"><span style="width:${Math.max(3, 100 * (v ?? 0))}%;background:var(--accent)"></span></div><span class="small faint num" style="text-align:right">${v == null ? "" : ord(100 * v)}</span></div>`;
+    }).join("");
+    const r = p.rate || {};
+    const col = (p.college || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.cls || "")} at ${esc(c.team)}, ${c.season - 1}–${String(c.season).slice(2)} · similarity ${c.sim}</div></td>
+      <td class="num">${c.pick ? "#" + c.pick : "undrafted"}</td><td class="l small">${esc(c.pos || "")} · ${statLine(c.line)}</td><td class="num"><b>${fmt(c.ws, 1)}</b><div class="small faint">${c.seasons < 4 ? c.seasons + (c.seasons === 1 ? " season" : " seasons") + " so far" : "first 4 yrs"}</div></td></tr>`).join("");
+    const sty = (p.style || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.pos || "")} · ${esc(c.years.split("–")[0] === c.years.split("–")[1] ? c.years.split("–")[0] : c.years)}</div></td><td class="l small">${statLine(c.line)}</td><td class="num">${sgn(c.bpm)}</td></tr>`).join("");
+    return `<div class="grid xdet" style="padding:6px 2px">
+      <div><h3>Projected NBA profile</h3><p class="note" style="margin:-2px 0 8px">What his college game translates to in his first NBA seasons, as a percentile among NBA players (2,000+ minutes).</p>${prof}
+        <p class="note">Comp hit rate: of the ${r.n || 25} most similar finished college careers at this stage, <b>${pct(r.nba)}</b> reached the NBA and <b>${pct(r.success)}</b> became rotation players.</p></div>
+      <div><h3>College comps → what they became</h3><p class="note" style="margin:-2px 0 8px">Past college players at the same stage whose game projected most like his. NBA line = first 4 NBA seasons.</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Pick</th><th class="l nosort">NBA</th><th class="nosort">WS</th></tr></thead><tbody>${col || `<tr><td class="faint l" colspan="4">No comps.</td></tr>`}</tbody></table></div></div>
+      <div><h3>Plays like</h3><p class="note" style="margin:-2px 0 8px">NBA players (incl. internationals) whose actual NBA profile is closest to his projected one. Line = career average in 2009–2026.</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">NBA player</th><th class="l nosort">Line</th><th class="nosort">BPM</th></tr></thead><tbody>${sty}</tbody></table></div></div></div>`;
+  }
 
   async function viewProspects() {
     const [d] = await Promise.all([get("prospects.json"), teams()]);
@@ -405,18 +427,27 @@
     const n = rows.length, shown = rows.slice(0, XF.limit);
     const th = (key, label, title = "", cls = "") => `<th data-k="${key}" class="${cls} ${k === key ? "sorted" : ""}" title="${esc(title)}" scope="col">${label}${k === key ? (dr > 0 ? " ↑" : " ↓") : ""}</th>`;
     const head = `<thead><tr>${th("board", "Board", "Projected order among college players (draft model)", "rankcol")}${th("name", "Player", "", "l")}${th("team", "Team", "", "l")}${th("age", "Age", "Age on draft day")}${cols.map(([c, l, , t]) => c === "comps" ? `<th class="l nosort" title="${esc(t)}">${l}</th>` : th(c, l, t || "")).join("")}</tr></thead>`;
+    const ncol = cols.length + 4;
     const body = shown.map((p) => {
       const cells = cols.map(([c, , f, , inv]) => {
         const v = p[c];
-        if (c === "comps") return `<td class="l small wrap" style="min-width:260px">${(v || []).map((x) => `${esc(x.name)} <span class="faint">(${x.season}, #${x.pick} → ${fmt(x.ws, 1)})</span>`).join("<br>")}</td>`;
+        if (c === "comps") return `<td class="l small wrap" style="min-width:220px">${(v || []).slice(0, 3).map((x) => esc(x.name)).join(", ")}</td>`;
+        if (f === "rate") return `<td class="num">${v && isNum(v.success) ? pct(v.success) : "–"}</td>`;
         if (f === "pct") return `<td><span class="heat num" style="background:color-mix(in srgb, var(--accent) ${Math.round(Math.min(1, v || 0) * 40)}%, transparent)">${v < 0.005 ? "<1%" : pct(v)}</span></td>`;
         return `<td><span class="heat num" style="${heat(pctRank(dist[c], v), inv === true)}">${fmt(v, f)}</span></td>`;
       }).join("");
-      return `<tr><td class="rankcol">${p.board}</td><td class="l"><b>${esc(p.name)}</b><div class="small faint">${esc([p.cls, p.ht, p.role].filter(Boolean).join(" · "))}</div></td>
-        <td class="l">${TEAMS[p.team] ? teamLink(p.team) : esc(p.team)}</td><td class="num">${fmt(p.age, 1)}</td>${cells}</tr>`;
+      return `<tr class="xrow" data-pid="${p.pid}" style="cursor:pointer" title="Click for NBA comps"><td class="rankcol">${p.board}</td><td class="l"><b>${esc(p.name)}</b> <span class="faint small">${XOPEN.has(p.pid) ? "▾" : "▸"}</span><div class="small faint">${esc([p.cls, p.ht, p.role].filter(Boolean).join(" · "))}</div></td>
+        <td class="l">${TEAMS[p.team] ? teamLink(p.team) : esc(p.team)}</td><td class="num">${fmt(p.age, 1)}</td>${cells}</tr>`
+        + (XOPEN.has(p.pid) ? `<tr class="xdetail"><td colspan="${ncol}" class="l" style="white-space:normal;background:var(--surface-2)">${prospectDetail(p)}</td></tr>` : "");
     }).join("");
     const tbl = $("#xtbl");
     tbl.innerHTML = head + `<tbody>${body || `<tr><td class="l faint" colspan="9">No prospects match.</td></tr>`}</tbody>`;
+    $$("tr.xrow", tbl).forEach((tr) => tr.addEventListener("click", (e) => {
+      if (e.target.closest("a")) return;
+      const id = +tr.dataset.pid;
+      if (XOPEN.has(id)) XOPEN.delete(id); else XOPEN.add(id);
+      drawProspects(P);
+    }));
     $$("th[data-k]", tbl).forEach((h) => h.addEventListener("click", () => {
       const key = h.dataset.k;
       if (XF.sort === key) XF.dir *= -1;
@@ -463,6 +494,13 @@
           <div class="tbl-wrap"><table><thead><tr><th class="nosort">#</th><th class="l nosort">Player</th><th class="nosort">P(success)</th><th class="nosort">Pick</th><th class="nosort">4-yr WS</th></tr></thead><tbody>
           ${S.last_class.board.map((r) => `<tr><td class="num">${r.rank}</td><td class="l">${esc(r.name)} <span class="faint small">${esc(r.team)}</span></td><td class="num">${pct(r.p_success)}</td><td class="num">${r.pick == null ? "undrafted" : "#" + r.pick}</td><td class="num ${r.success ? "pos" : "faint"}">${fmt(r.ws, 1)}</td></tr>`).join("")}</tbody></table></div></div>
       </div>
+      ${bt.comps ? `<div class="section card"><h2>How the NBA comps work</h2>
+        <p class="small muted">A translation model (multi-output ridge regression) learns how a college profile turns into an NBA profile over a player's first ${S.window} NBA seasons. It's trained on ${bt.comps.n_players.toLocaleString()} college players who reached the NBA, ${bt.comps.classes[0]}–${bt.comps.classes[1]}. College comps are the past college players at the same stage (same class, age within 1.5 years) whose <i>projected</i> NBA profile, plus height, is closest. "Plays like" comps are NBA players whose <i>actual</i> profile is closest to the projection. Validation: each held-out class's five comps (chosen from earlier classes) predict the player's real NBA profile. Learned comps beat comps picked on raw college stats on average (R² ${fmt(Object.values(bt.comps.learned).reduce((a, b) => a + b, 0) / Object.keys(bt.comps.learned).length, 2)} vs ${fmt(Object.values(bt.comps.raw).reduce((a, b) => a + b, 0) / Object.keys(bt.comps.raw).length, 2)}).</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">NBA dimension</th>${Object.keys(bt.comps.translation_r2).map((k) => `<th class="nosort">${esc(bt.comps.labels[k] || k)}</th>`).join("")}</tr></thead><tbody>
+          <tr><td class="l">Translation model R²</td>${Object.values(bt.comps.translation_r2).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr>
+          <tr><td class="l">Learned comps R²</td>${Object.values(bt.comps.learned).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr>
+          <tr><td class="l">Raw-stat comps R²</td>${Object.values(bt.comps.raw).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr></tbody></table></div>
+        <p class="note">Out-of-sample. Rebounding, blocks, assists and 3-point volume carry over from college. Efficiency and overall impact (true shooting, BPM) are much harder to see coming.</p></div>` : ""}
       <div class="section grid g3">
         <div class="card"><h2>Calibration</h2><p class="note" style="margin-top:-4px">Out-of-sample P(success) vs what happened (before the small Platt correction the live model applies).</p>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Bin</th><th class="nosort">Players</th><th class="nosort">Pred.</th><th class="nosort">Obs.</th></tr></thead><tbody>

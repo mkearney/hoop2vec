@@ -94,3 +94,17 @@ def test_sanitize_makes_json_safe():
     from hoop2vec.prospects import _sanitize
     x = _sanitize({"a": np.float64("nan"), "b": [np.int64(3), np.float32(1.23456)], "c": np.bool_(True)})
     assert json.loads(json.dumps(x, allow_nan=False)) == {"a": None, "b": [3, 1.2346], "c": True}
+
+
+def test_translator_recovers_a_linear_mapping():
+    """College features -> NBA profile: a clean linear signal should be recovered almost exactly."""
+    from hoop2vec import comps as CP
+    from hoop2vec.prospects import FEATURES
+    rng = np.random.default_rng(3)
+    n = 1500
+    X = pd.DataFrame({c: rng.normal(size=n) for c in FEATURES})
+    Y = pd.DataFrame({d: 2.0 * X[FEATURES[i]] + 10 + rng.normal(scale=0.1, size=n) for i, d in enumerate(CP.NBA_DIMS)})
+    tm = CP.Translator(alpha=1.0).fit(X, Y)
+    pred = tm.to_raw(tm.predict_z(X))
+    for d in CP.NBA_DIMS:
+        assert np.corrcoef(pred[d], Y[d])[0, 1] > 0.99

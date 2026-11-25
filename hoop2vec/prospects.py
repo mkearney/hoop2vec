@@ -85,7 +85,7 @@ def nba_seasons() -> pd.DataFrame:
     if p.exists():
         return pd.read_parquet(p)
     from .sources import bbref
-    return pd.concat([bbref.advanced(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
+    return pd.concat([bbref.season_table(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
 
 
 HIST_COLS = ["season", "pid", "player", "team", "conf", "cls", "ht", "role", "dob", "pick", "rec_rank", "gp", "mpg",
@@ -568,11 +568,23 @@ def run_backtest(T) -> dict:
         {"rank": i + 1, "name": r.player, "team": r.team, "p_success": round(float(r.p_success), 3),
          "pick": None if pd.isna(r.pick_now) else int(r.pick_now), "ws": round(float(r.nba_ws), 1), "success": bool(r.success)}
         for i, r in enumerate(cls.itertuples())]}
+    try:
+        from . import comps as CP
+        col = college()
+        nba = nba_seasons()
+        done = col[col["season"] < current_season()]
+        early, _ = CP.nba_profiles(nba, match_nba(done, nba), done.groupby("pid")["season"].max())
+        v_raw = CP.validate(T, early)
+        v = CP.validate(T, early, ht_sd=CP.HT_SD)
+        S["comps"] = {"translation_r2": v["translation_r2"], "learned": v["comp_r2"]["learned"], "raw": v_raw["comp_r2"]["raw"],
+                      "n_players": v["n_players"], "classes": v["classes"], "labels": CP.DIM_LABELS}
+    except Exception as e:  # comps validation is informative only
+        print("comps validation skipped:", e)
     BT_PATH.write_text(json.dumps(_sanitize(S), indent=1))
     return S
 
 
-def publish(T, write_json, season=None, n_board=400):
+def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
     """Fit the final models on all completed seasons and write docs/data/prospects.json."""
     season = season or current_season()
     D, S = draft_rows(T), success_rows(T)
@@ -591,7 +603,12 @@ def publish(T, write_json, season=None, n_board=400):
     cur["succ_rank"] = cur["p_success"].rank(ascending=False, method="first").astype(int)
     show = cur[(cur["board"] <= n_board) | (cur["succ_rank"] <= 200)].sort_values("board")
     hist = T[T["final"] & T["drafted"] & T["mature"].fillna(False).astype(bool)]
-    cp = comps(hist, show)
+    from . import comps as CP
+    nba = nba if nba is not None else nba_seasons()
+    done = T[T["season"] < season]
+    link = link if link is not None else match_nba(college()[lambda c: c["season"] < season], nba)
+    early, car = CP.nba_profiles(nba, link, done.groupby("pid")["season"].max())
+    cp = CP.build(T, early, car, show)
     coef = sm.coefficients()
     players = []
     for (i, r), c in zip(show.iterrows(), cp):
@@ -602,7 +619,7 @@ def publish(T, write_json, season=None, n_board=400):
             "obpm": r.obpm, "dbpm": r.dbpm, "usg": r.usg_raw, "ts": r.ts_raw, "ast_pct": r.ast_pct, "to_pct": r.to_pct,
             "blk_pct": r.blk_pct, "stl_pct": r.stl_pct, "tp_pct": (100 * r.tpm / r.tpa) if r.tpa else None, "tpa": r.tpa / max(r.gp, 1),
             "board": int(r.board), "succ_rank": int(r.succ_rank), "draft_score": r.draft_score, "p5": r.p5, "p14": r.p14, "p30": r.p30, "p60": r.p60,
-            "p_success": r.p_success, "p_star": r.p_star, "exp_ws": r.exp_ws, "comps": c})
+            "p_success": r.p_success, "p_star": r.p_star, "exp_ws": r.exp_ws, **c})
     hist_rates = {}
     for lo, hi in ((1, 5), (6, 14), (15, 30), (31, 60)):
         x = hist[hist["pick_now"].between(lo, hi)]
@@ -623,5 +640,5 @@ def publish(T, write_json, season=None, n_board=400):
 def update_history():
     """After an NBA season ends: refetch completed NBA seasons and refresh the committed college history."""
     from .sources import bbref
-    nba = pd.concat([bbref.advanced(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
+    nba = pd.concat([bbref.season_table(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
     save_history(college(), nba)

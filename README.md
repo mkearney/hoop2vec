@@ -66,6 +66,21 @@ Two models on every D-I player-season since 2008 (`hoop2vec/prospects.py`, `docs
   steal rates). The current season is shrunk toward last season and the population, the same way in training.
   Each prospect also gets three statistical comps.
 
+**NBA comps** (`hoop2vec/comps.py`): a translation model (multi-output ridge regression) learns how a college profile
+turns into an NBA profile over a player's first four NBA seasons: usage, true shooting, 3-point and free-throw
+rate, rebound/assist/steal/block/turnover rates and BPM. Three outputs per prospect:
+
+* **College comps:** past college players at the same stage (same class, age within 1.5 years) with the closest
+  *projected* NBA profile plus height, shown with what they actually became (pick, NBA line, Win Shares).
+* **Plays like:** NBA players, international ones included, whose *actual* NBA profile is closest to the
+  prospect's projected one.
+* **Comp hit rate:** of the 25 most similar finished college careers, the share that reached the NBA and the share
+  that became rotation players.
+
+Validated out-of-sample by class: comps chosen this way predict a player's real NBA profile better than comps
+chosen on raw college stats (average R² 0.40 vs 0.35). Rebounding, blocks, assists and 3-point volume translate
+well (R² 0.6–0.76); efficiency and overall impact much less (0.2–0.3).
+
 Forward-chained backtest by draft year (each draft or class predicted by a model trained only on earlier ones):
 
 | | Model | Recruiting + BPM + age baseline | Actual draft slot |

@@ -364,3 +364,11 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
   .lb-row { grid-template-columns: 22px minmax(0, 1fr) 48px !important; }
   .lb-bar { display: none; }
 }
+
+/* prospect detail panel */
+.xdet { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.5fr) minmax(0, 1.1fr); }
+.xdet td, .xdet th { white-space: normal; padding: 6px 6px; }
+.xdet table { background: var(--surface); border-radius: 10px; }
+@media (max-width: 1000px) {
+  .xdet { grid-template-columns: minmax(0, 1fr); position: sticky; left: 8px; width: min(100%, calc(100vw - 56px)); }
+}

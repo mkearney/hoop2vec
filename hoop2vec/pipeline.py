@@ -333,11 +333,11 @@ def stage_prospects(refresh=False, backtest=False):
     from . import prospects as PRO
     try:
         log("NBA prospects")
-        T, *_ = PRO.build_table(refresh_current=refresh)
+        T, _, nba, link = PRO.build_table(refresh_current=refresh)
         if backtest or not PRO.BT_PATH.exists():
             log("  prospect backtest (forward-chained by draft year)")
             PRO.run_backtest(T)
-        out = PRO.publish(T, write_json)
+        out = PRO.publish(T, write_json, nba=nba, link=link)
         log(f"  {len(out['players']) if out else 0} prospects on the board")
     except Exception as e:  # never block the rest of the site
         log(f"  prospects skipped: {e!r}")
