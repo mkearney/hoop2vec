@@ -1,0 +1,13 @@
+# WNBA postseason format (2026). Read by hoop2vec/playoffs.py. Past seasons' series lengths are read from the results.
+games: 44                  # regular-season games per team (unscheduled ones are filled in, see playoffs.py)
+by_conference: false       # top 8 overall, regardless of conference
+direct: 8
+play_in: false
+rounds: [3, 5, 7]          # 2026: best-of-3, best-of-5 semifinals (both ended 3-0), best-of-7 Finals
+patterns:
+  3: [1, 0, 1]             # 1-1-1 (2022-24 was 2-1: [1, 1, 0])
+  5: [1, 1, 0, 0, 1]       # 2-2-1
+  7: [1, 1, 0, 0, 1, 0, 1] # 2-2-1-1-1
+bracket: [[1, 8], [4, 5], [2, 7], [3, 6]]
+round_names: [First round, Semifinals, WNBA Finals]
+not_in_standings: "Commissioner's Cup Championship"

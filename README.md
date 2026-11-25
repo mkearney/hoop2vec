@@ -1,12 +1,13 @@
 # hoop2vec
 
-Daily **men's and women's** college basketball **power ratings**, **game forecasts**, **player values**, **pro
-prospects** (NBA / WNBA), data-driven **team identities** and the **2027 NCAA brackets**, built only from free
-public data. Every number on the site is computed point-in-time and checked for look-ahead leakage against closing
+Daily **power ratings**, **game forecasts**, **player values** and data-driven **team identities** for men's and
+women's college basketball, the **NBA** and the **WNBA**, plus **pro prospects** for the college players, the
+**2027 NCAA brackets** and **NBA / WNBA playoff odds**, built only from free public data. Every number on the site is computed point-in-time and checked for look-ahead leakage against closing
 betting lines.
 
 **Site:** https://mkearney.github.io/hoop2vec/ (GitHub Pages, served from `docs/`). The home page picks a league:
-`docs/mens/` and `docs/womens/` run the same app (`docs/assets/`) on their own data (`docs/<league>/data/`).
+`docs/mens/`, `docs/womens/`, `docs/nba/` and `docs/wnba/` run the same app (`docs/assets/`) on their own data
+(`docs/<league>/data/`).
 
 hoop2vec merges two earlier projects. Where they overlapped, the better piece was kept, or both were combined:
 
@@ -123,7 +124,7 @@ the blend beats them on 41,280 games (0.5258 vs 0.5331), so they are not used as
 ## Women's basketball
 
 Same app, same models, rebuilt on what is free for the women's game (`python -m hoop2vec <mode> --womens`;
-`hoop2vec/womens_data.py`). There is no women's barttorvik.com, so everything comes from ESPN plus
+`hoop2vec/espn_data.py`). There is no women's barttorvik.com, so everything comes from ESPN plus
 Basketball-Reference:
 
 | | Men's | Women's |
@@ -170,6 +171,61 @@ sportsbook lines ESPN carries. Women's markets are thinner, so that is plausible
 the men's leak, so it was checked the same way: a one-term model on the roster rating alone scores 0.404 on those
 games, worse than the line (0.396), and the Kalman rating alone is level with it.
 
+## NBA and WNBA
+
+Same app and models, minus the Prospects tab, with the bracket replaced by a playoff model
+(`python -m hoop2vec <mode> --nba` / `--wnba`; data from `hoop2vec/espn_data.py`, playoffs in `hoop2vec/playoffs.py`).
+Everything comes from ESPN's public API: every game since 2008 with box scores and play-by-play, standings and
+official seeds, and ESPN's injury report. Preseason and All-Star games are dropped. Teams are keyed by nickname
+(Lakers, Clippers, Liberty), and relocated or folded franchises (Connecticut Sun, Sacramento Monarchs) are kept.
+
+**Playoffs.** College ends in one bracket; the pros play long seasons into seeded best-of-N series, so the forecast
+works differently:
+
+* The rest of the regular season is played out 10,000 times, each game priced by the game model at its arena. Each
+  simulated season also shifts every team's strength by a random amount, sized from history: how far a team's
+  rating moved between this point of a season and its end (wide in November, small in April). Games the NBA hasn't
+  scheduled yet (each team's last two, set after the Cup group stage) are filled in as neutral-site games.
+* Ties: head-to-head among the tied teams, then conference record (NBA), then a coin flip. The official rules have
+  a few more steps that rarely matter; once the regular season ends, the official seeds are used.
+* NBA: play-in (7 hosts 8, 9 hosts 10, loser of 7-8 hosts winner of 9-10), conference brackets, best-of-7 with a
+  2-2-1-1-1 home pattern, home court to the better record. WNBA: top 8 overall, best-of-3 (1-1-1), best-of-5
+  semifinals (2-2-1), best-of-7 Finals. Formats live in `overrides/<league>/playoffs.yaml`.
+* Each series is solved exactly from two numbers, the home-court team's chance to win at home and on the road,
+  through its home pattern, from any series score. Games already played are locked in, so the same code covers the
+  regular season, the playoffs in progress and a finished season (shown with the odds the model had before round 1).
+* Backtest: every past series, predicted before game 1 by the season-ahead models (trained on earlier seasons only):
+
+| Series, log loss | NBA (224 series, 2012–2026) | WNBA (97 series, 2012–2025) |
+|---|---|---|
+| Home-court team wins at its historical rate | 0.598 | 0.591 |
+| hoop2vec blend | 0.558 | 0.569 |
+| Linear game model | 0.557 | 0.576 |
+| Adjusted efficiency | **0.555** | 0.566 |
+| Elo | 0.581 | **0.557** |
+
+**Game model.** Season-ahead backtest, log loss:
+
+| | NBA, all games (19,186) | NBA playoffs (1,258) | NBA, DraftKings lines (1,071) | WNBA, all games (3,203) | WNBA playoffs (260) |
+|---|---|---|---|---|---|
+| **hoop2vec blend** | **0.6117** | 0.6361 | 0.5960 | 0.6160 | 0.6228 |
+| Matchup network | 0.6118 | 0.6386 | 0.5952 | 0.6212 | 0.6256 |
+| Linear game model | 0.6163 | 0.6348 | 0.6041 | 0.6155 | 0.6216 |
+| Adjusted efficiency | 0.6176 | **0.6346** | 0.6054 | **0.6152** | **0.6207** |
+| Elo | 0.6174 | 0.6444 | 0.6082 | 0.6190 | 0.6217 |
+| Sportsbook line (benchmark) | – | – | **0.5812** | – | – |
+
+Pro games are much closer than college games, so every number sits near 0.6. In the NBA the blend beats the linear
+model by 0.0046 (95% CI 0.0033–0.0060) and the network carries 80% of it; the sportsbook beats everything by about
+0.015, as a sharp market should. With 15 small WNBA seasons the models are within noise of each other and the
+backtest puts 80% on the linear model. The Kalman settings were re-tuned on each league (`python -m hoop2vec tune`)
+and kept only if they did better on the three most recent seasons; the college defaults held up in both.
+
+**Players and styles.** Player values are the same ESPN-built box plus/minus as the women's college site (per-48
+in the NBA), with a newcomer prior fitted from past first-season players. Identity models are fitted on each
+league's play-by-play (570 NBA and 220 WNBA team-seasons), with fewer archetypes than college (6/5/5 and 4/4/4) and
+names carried over from the men's model where the dimensions match, then edited by hand.
+
 ## Usage
 
 ```bash
@@ -186,7 +242,8 @@ python -m hoop2vec ingest 2015-2026   # play-by-play for past seasons (only need
 python -m hoop2vec style      # refit the team-identity model from the play-by-play seasons
 python -m hoop2vec site       # rewrite the page shells (docs/index.html chooser + docs/<league>/index.html)
 
-python -m hoop2vec daily --womens     # any mode, for the women's site (default: --mens)
+python -m hoop2vec daily --womens     # any mode, for another league: --womens, --nba, --wnba (default: --mens)
+python -m hoop2vec tune --nba         # re-tune the dynamic rating for a league (kept only if it helps)
 ```
 
 Each league keeps its own `data/<league>/`, `artifacts/<league>/`, `history/<league>/`, `overrides/<league>/` and
@@ -208,8 +265,8 @@ To preview locally: `cd docs && python -m http.server`.
 
 ### Automation
 
-* `.github/workflows/daily.yml`: every morning, November through April, men's then women's.
-* `.github/workflows/retrain.yml`: monthly retrain + backtest for both leagues, or on demand.
+* `.github/workflows/daily.yml`: every morning, all four leagues in turn (a league out of season has nothing new).
+* `.github/workflows/retrain.yml`: monthly retrain + backtest for every league, or on demand.
 
 Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
 
@@ -217,9 +274,10 @@ Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/
 
 ```
 hoop2vec/            python package
-  config.py          league switch (HOOP2VEC_LEAGUE / --womens): paths, ESPN sport, game length
+  config.py          league switch (HOOP2VEC_LEAGUE / --womens / --nba / --wnba): paths, calendar, game length
   sources/           torvik.py, espn.py, pbp.py (play-by-play parser), injuries.py, bbref.py (NBA + WNBA)
-  womens_data.py     women's games, conferences, player values and college player table from ESPN
+  espn_data.py       games, standings, player values (and the women's college player table) from ESPN
+  playoffs.py        NBA / WNBA: season simulation, tiebreakers, play-in, best-of-N series, series backtest
   games.py           games table, Torvik<->ESPN crosswalk, venues, NCAA rounds/seeds
   espn_fallback.py   current season from ESPN when Torvik is unreachable
   ingest.py          ESPN play-by-play ingest (box score, PBP counts, lineups, closing line)
@@ -236,5 +294,5 @@ hoop2vec/            python package
 history/<league>/    compact committed copy of completed seasons (games, players, venues, lines, pro careers)
 artifacts/<league>/  trained models, blend weight, crosswalk, team metadata, style model, backtests
 overrides/<league>/  hand-edited injuries and bracket
-docs/                static site: index.html (choose a league), assets/ (shared app), mens/ and womens/
+docs/                static site: index.html (choose a league), assets/ (shared app), mens/ womens/ nba/ wnba/
 ```

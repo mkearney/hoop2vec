@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>hoop2vec: College Basketball Ratings and Forecasts</title>
-  <meta name="description" content="Daily ratings, game forecasts, player values and pro prospects for men's and women's college basketball, plus the 2027 NCAA tournaments. Built on free public data.">
+  <meta name="description" content="Daily ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, plus the 2027 NCAA tournaments and pro playoff odds. Built on free public data.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -17,9 +17,10 @@
   <main class="wrap">
     <section class="choose-hero">
       <h1>College basketball ratings and forecasts</h1>
-      <p class="sub">Every Division I team gets a new rating each morning, men's and women's. The same models forecast games, value players, rank pro prospects and price out the 2027 NCAA tournament. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
+      <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">
+      <h2 class="choices-head">College</h2>
       <a class="choice card" href="mens/" data-league="mens">
         <span class="kind">Men's college basketball</span>
         <span class="big">Men's</span>
@@ -34,6 +35,21 @@
         <span class="top5" id="top-womens"></span>
         <span class="go">Open women's →</span>
       </a>
+      <h2 class="choices-head">Pro</h2>
+      <a class="choice card" href="nba/" data-league="nba">
+        <span class="kind">Pro basketball</span>
+        <span class="big">NBA</span>
+        <span class="muted small">Ratings, players, playoff odds with the play-in, game forecasts and team styles.</span>
+        <span class="top5" id="top-nba"></span>
+        <span class="go">Open NBA →</span>
+      </a>
+      <a class="choice card" href="wnba/" data-league="wnba">
+        <span class="kind">Pro basketball</span>
+        <span class="big">WNBA</span>
+        <span class="muted small">Ratings, players, playoff odds, game forecasts and team styles.</span>
+        <span class="top5" id="top-wnba"></span>
+        <span class="go">Open WNBA →</span>
+      </a>
     </section>
   </main>
   <footer class="wrap footer"><span>hoop2vec · free public data only</span><a href="https://github.com/mkearney/hoop2vec">source</a></footer>
@@ -47,7 +63,7 @@
       try { localStorage.setItem("hoop2vec-theme", root.dataset.theme); } catch (e) {}
     });
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-    for (const lg of ["mens", "womens"]) {
+    for (const lg of ["mens", "womens", "nba", "wnba"]) {
       fetch(lg + "/data/ratings.json", { cache: "no-cache" }).then((r) => r.ok ? r.json() : null).then((d) => {
         if (!d) return;
         document.getElementById("top-" + lg).innerHTML = "<b>Top 5 today</b>" + d.teams.slice(0, 5).map((t) =>

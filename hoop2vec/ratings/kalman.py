@@ -17,6 +17,8 @@ from dataclasses import asdict, dataclass
 import numpy as np
 import pandas as pd
 
+from ..config import GAME_MINUTES, POSS_RANGE
+
 
 @dataclass
 class RatingParams:
@@ -64,7 +66,7 @@ class RatingEngine:
         mins = g["minutes"].to_numpy(float)
         yh = 100 * g["home_score"].to_numpy(float) / poss
         ya = 100 * g["away_score"].to_numpy(float) / poss
-        tempo = poss * 40 / mins
+        tempo = poss * GAME_MINUTES / mins
         day = ((g["date"] - g["date"].min()).dt.days).to_numpy()
         season = g["season"].to_numpy()
         cmap = {}
@@ -130,7 +132,7 @@ class RatingEngine:
     @staticmethod
     def pre_margin(pre: pd.DataFrame, games: pd.DataFrame, h: float):
         """Pre-game expected home margin (points) from the ratings alone."""
-        poss = (pre["k_mut"] + pre["k_tA"] + pre["k_tB"]).clip(55, 85)
+        poss = (pre["k_mut"] + pre["k_tA"] + pre["k_tB"]).clip(*POSS_RANGE)
         loc = np.where(games["neutral"].to_numpy(), 0.0, 1.0)
         em = (pre["k_oA"] - pre["k_dA"]) - (pre["k_oB"] - pre["k_dB"]) + 2 * h * loc
         return em * poss / 100, poss
@@ -176,7 +178,7 @@ def to_engine_games(games: pd.DataFrame) -> pd.DataFrame:
         "home_score": np.where(a_home, g["pts_a"], g["pts_b"]).astype(float),
         "away_score": np.where(a_home, g["pts_b"], g["pts_a"]).astype(float),
         "neutral": (g["loc"] == 0).to_numpy(), "poss": g["poss"].to_numpy(float),
-        "minutes": (g["minutes"].fillna(200.0).clip(lower=200.0) / 5.0).to_numpy(float),
+        "minutes": (g["minutes"].fillna(5 * GAME_MINUTES).clip(lower=5 * GAME_MINUTES) / 5.0).to_numpy(float),
         "a_home": a_home,
     })
 

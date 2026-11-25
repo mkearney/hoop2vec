@@ -2,7 +2,7 @@ name: retrain
 
 on:
   schedule:
-    - cron: "41 9 1 11,12,1,2,3 *"      # first of each month in season
+    - cron: "41 9 1 * *"      # first of each month
   workflow_dispatch:
 
 permissions:
@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 1          # one league at a time so the two commits don't race
+      max-parallel: 1          # one league at a time so the commits don't race
       matrix:
-        league: [mens, womens]
+        league: [mens, womens, nba, wnba]
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4

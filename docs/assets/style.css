@@ -373,13 +373,15 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
   .xdet { grid-template-columns: minmax(0, 1fr); position: sticky; left: 8px; width: min(100%, calc(100vw - 56px)); }
 }
 
-/* ---------- league switch (docs/mens, docs/womens) + home chooser (docs/index.html) */
-.league-pill { font-size: 12px; font-weight: 650; color: var(--accent-ink, var(--accent)); background: var(--accent-soft, var(--surface-2));
-  padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex: none; }
-.switch { font-size: 13px; font-weight: 550; color: var(--text-2); padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; white-space: nowrap; }
-.switch:hover { text-decoration: none; color: var(--text); background: var(--surface-2); }
+/* ---------- league menu (every league page) + home chooser (docs/index.html) */
+.leagues { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: 9px; flex: none; }
+.leagues a { font-size: 12.5px; font-weight: 600; color: var(--text-2); padding: 4px 9px; border-radius: 7px; white-space: nowrap; }
+.leagues a:hover { text-decoration: none; color: var(--text); }
+.leagues a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.choices-head { grid-column: 1 / -1; font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-3); margin: 10px 0 -6px; }
 .chooser main { min-height: calc(100vh - 140px); }
-.choose-hero { text-align: center; max-width: 720px; margin: 56px auto 32px; }
+.choose-hero { text-align: center; max-width: 760px; margin: 56px auto 32px; }
 .choose-hero h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -.02em; margin: 0 0 12px; }
 .choose-hero .sub { color: var(--text-2); font-size: 16px; line-height: 1.55; margin: 0; }
 .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 880px; margin: 0 auto 56px; }
@@ -393,5 +395,5 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .choice .top5 .row { display: flex; align-items: center; gap: 8px; }
 .choice .top5 .logo { width: 18px; height: 18px; }
 .choice .go { margin-top: auto; font-weight: 650; color: var(--accent); }
-@media (max-width: 860px) { .switch { padding: 4px 8px; font-size: 12.5px; } }
+@media (max-width: 860px) { .leagues a { padding: 4px 7px; font-size: 12px; } }
 @media (max-width: 640px) { .choices { grid-template-columns: 1fr; } .choose-hero { margin-top: 32px; } }

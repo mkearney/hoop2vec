@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from ..config import ARTIFACTS, FIRST_TRAIN_SEASON
+from ..config import ARTIFACTS, FIRST_TRAIN_SEASON, POSS_RANGE
 from . import linear as LIN
 from . import train as TR
 
@@ -49,7 +49,8 @@ def paired_ci(y_margin, p1, p2, n_boot=2000, seed=0):
 
 # ------------------------------------------------------------------ simple rating baselines
 def _tempo(df):
-    return ((df["a_adjt"] + df["b_adjt"]) / 200.0).fillna(0.68)
+    t = (df["a_adjt"] + df["b_adjt"]) / 200.0
+    return t.fillna(t.median() if t.notna().any() else 0.68)
 
 
 def design(df: pd.DataFrame, kind: str) -> np.ndarray:
@@ -114,7 +115,7 @@ class Net:
 
 def add_derived(feat: pd.DataFrame) -> pd.DataFrame:
     f = feat.copy()
-    f["poss_exp"] = (f["k_mut"] + f["a_k_t"] + f["b_k_t"]).clip(55, 85)
+    f["poss_exp"] = (f["k_mut"] + f["a_k_t"] + f["b_k_t"]).clip(*POSS_RANGE)
     f["k_margin"] = ((f["a_k_o"] - f["a_k_d"]) - (f["b_k_o"] - f["b_k_d"])) * f["poss_exp"] / 100.0
     f["margin"] = f["pts_a"] - f["pts_b"]
     return f

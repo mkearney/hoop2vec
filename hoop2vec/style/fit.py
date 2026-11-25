@@ -139,9 +139,14 @@ def transfer_names(model: StyleModel, ref_model: StyleModel | None = None, ref_n
     return out
 
 
+# archetypes per block: 360 D-I teams a season support 6-7; 30 NBA or 12-15 WNBA teams support fewer
+N_ARCH = {"nba": {"offense": 6, "defense": 5, "roster": 5}, "wnba": {"offense": 4, "defense": 4, "roster": 4}}
+
+
 def run(rename: bool = False, n_arch=None):
+    from ..config import LEAGUE
     tabs, metas = build_tables()
-    model = fit(tabs, metas, n_arch=n_arch)
+    model = fit(tabs, metas, n_arch=n_arch or N_ARCH.get(LEAGUE))
     names_f = STYLE_DIR / "style_names.json"
     if rename or not names_f.exists():
         names_f.write_text(json.dumps(transfer_names(model), indent=1))

@@ -9,10 +9,17 @@
   const tip = $("#tooltip");
   const cache = {};
   // league: the same app serves the men's and women's sites
-  const IS_W = document.body.dataset.league === "womens";
-  const PRO = IS_W ? "WNBA" : "NBA";
-  const he = IS_W ? "she" : "he", his = IS_W ? "her" : "his";
-  const RATE_SRC = IS_W ? "ESPN box scores" : "Torvik";
+  const LEAGUE = document.body.dataset.league || "mens";
+  const IS_W = LEAGUE === "womens";                       // women's college
+  const IS_PRO = LEAGUE === "nba" || LEAGUE === "wnba";   // pro leagues: playoffs instead of a bracket, no prospects
+  const FEMALE = LEAGUE === "womens" || LEAGUE === "wnba";
+  const ESPN_ONLY = LEAGUE !== "mens";                    // every stat from ESPN box scores (no Torvik)
+  const LG = IS_PRO ? LEAGUE.toUpperCase() : "D-I";       // "an average D-I team" / "an average NBA team"
+  const PRO = FEMALE ? "WNBA" : "NBA";
+  const he = FEMALE ? "she" : "he", his = FEMALE ? "her" : "his";
+  const RATE_SRC = ESPN_ONLY ? "ESPN box scores" : "Torvik";
+  const TOPN = IS_PRO ? 8 : 25;
+  const seasonLabel = (x) => (LEAGUE === "wnba" ? String(x) : `${x - 1}–${String(x).slice(2)}`);
   const ROUND_NAMES = ["Opening Round", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
   const BLOCKS = [["offense", "Offense", "of"], ["defense", "Defense", "df"], ["roster", "Personnel", "ro"]];
 
@@ -111,7 +118,7 @@
     root.dataset.theme = dark ? "light" : "dark";
     try { localStorage.setItem("hoop2vec-theme", root.dataset.theme); } catch (e) { /* ignore */ }
   });
-  const routes = { ratings: viewRatings, players: viewPlayers, prospects: viewProspects, team: viewTeam, bracket: viewBracket, matchup: viewMatchup, games: viewGames,
+  const routes = { playoffs: viewPlayoffs, ratings: viewRatings, players: viewPlayers, prospects: viewProspects, team: viewTeam, bracket: viewBracket, matchup: viewMatchup, games: viewGames,
     styles: viewStyles, guide: viewGuide, method: viewMethod };
   const NAV = { team: "ratings", guide: "styles" };
   async function route() {
@@ -134,14 +141,14 @@
   window.addEventListener("hashchange", route);
   get("meta.json", true).then((m) => {
     if (!m) return;
-    const src = IS_W || m.source !== "espn" ? "" : m.torvik_through ? ` · Torvik thru ${m.torvik_through.slice(5)}, ESPN after` : " · ESPN data (backup)";
+    const src = ESPN_ONLY || m.source !== "espn" ? "" : m.torvik_through ? ` · Torvik thru ${m.torvik_through.slice(5)}, ESPN after` : " · ESPN data (backup)";
     $("#updated").textContent = `Updated ${m.updated}${src}`;
   });
 
   // ================================================================ RATINGS
   const VIEWS = {
     core: [
-      ["power", "Power", 1, false, "Points per 100 possessions better than an average D-I team on a neutral floor (final game model; 0 = average)"],
+      ["power", "Power", 1, false, `Points per 100 possessions better than an average ${LG} team on a neutral floor (final game model; 0 = average)`],
       ["k_em", "Dynamic", 1, false, "Game-by-game Kalman rating: offense − defense, pts / 100 possessions", true],
       ["eff_o", "AdjO", 1, false, "Adjusted offensive efficiency (pts / 100 poss)"],
       ["eff_d", "AdjD", 1, true, "Adjusted defensive efficiency (lower is better)"],
@@ -149,7 +156,7 @@
       ["adjt", "Tempo", 1, null, "Adjusted possessions / 40 min", true],
       ["roster", "Roster", 1, false, "Player-based strength: Σ minutes share × player value", true],
       ["injury_pts", "Inj", 1, false, "Availability adjustment in points (injuries / absences)"],
-      ["sos", "SOS", 1, false, "Average Power of opponents faced (0 = average D-I schedule)", true],
+      ["sos", "SOS", 1, false, `Average Power of opponents faced (0 = average ${LG} schedule)`, true],
     ],
     offense: [
       ["efg_o", "eFG%", 1, false], ["tov_o", "TO%", 1, true], ["orb_o", "OR%", 1, false], ["ftr_o", "FTR", 1, false],
@@ -177,7 +184,7 @@
     app.innerHTML = `
       <div class="page-head"><div>
         <h1>Power Ratings</h1>
-        <p class="sub">${r.season - 1}–${String(r.season).slice(2)} · ${r.teams.length} teams · updated ${esc(r.updated)}. <b>Power</b> is how many points per 100 possessions a team would beat an average D-I team by on a neutral floor (0 = average), from the final game model: a matchup network blended with a dynamic-rating linear model, checked for leakage against betting lines.</p>
+        <p class="sub">${seasonLabel(r.season)} · ${r.teams.length} teams · updated ${esc(r.updated)}. <b>Power</b> is how many points per 100 possessions a team would beat an average ${LG} team by on a neutral floor (0 = average), from the final game model: a matchup network blended with a dynamic-rating linear model, checked for leakage against betting lines.</p>
       </div></div>
       <div class="controls">
         <input type="search" id="q" placeholder="Search teams…" value="${esc(R.q)}" style="width:220px" aria-label="Search teams">
@@ -249,15 +256,15 @@
   // ================================================================ PLAYERS
   const PCOLS = {
     overview: [["impact", "Impact", 1, `Team points per 100 possessions ${he} adds over a replacement-level player (value above replacement × minutes share)`],
-      ["value", "Value", 1, "Points per 100 possessions vs an average D-I player when on the floor: de-leaked box plus/minus, shrunk toward a prior"],
+      ["value", "Value", 1, `Points per 100 possessions vs an average ${LG} player when on the floor: de-leaked box plus/minus, shrunk toward a prior`],
       ["o", "Off", 1, "Offensive part of Value"], ["d", "Def", 1, "Defensive part of Value"], ["mpg", "MPG", 1, "Minutes per game"],
       ["ppg", "PPG", 1, "Points per game (ESPN box scores)"], ["rpg", "RPG", 1], ["apg", "APG", 1], ["usg", "Usg%", 1, `Usage rate (${RATE_SRC})`],
       ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["avail", "Avail", 0, `Chance ${he} plays next game`]],
     scoring: [["ppg", "PPG", 1], ["fg_pct", "FG%", 1], ["tpm", "3PM", 1, "Threes made per game"], ["tp_pct", "3P%", 1], ["ft_pct", "FT%", 1],
-      ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["efg", "eFG%", 1, `Effective FG% (${RATE_SRC})`], ["usg", "Usg%", 1]].concat(IS_W ? [] : [["ortg", "ORtg", 1, "Points produced per 100 possessions used (Torvik)"]]),
+      ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["efg", "eFG%", 1, `Effective FG% (${RATE_SRC})`], ["usg", "Usg%", 1]].concat(ESPN_ONLY ? [] : [["ortg", "ORtg", 1, "Points produced per 100 possessions used (Torvik)"]]),
     playmaking: [["apg", "APG", 1], ["tpg", "TOPG", 1, "Turnovers per game"], ["ast_pct", "Ast%", 1, `Assist rate (${RATE_SRC})`], ["to_pct", "TO%", 1, `Turnover rate (${RATE_SRC})`, true],
       ["rpg", "RPG", 1], ["orb_pct", "OR%", 1], ["drb_pct", "DR%", 1], ["spg", "SPG", 1], ["bpg", "BPG", 1], ["stl_pct", "Stl%", 1], ["blk_pct", "Blk%", 1]],
-    profile: [["cls", "Yr", null], ["ht", "Ht", null], ["pos", "Pos", null]].concat(IS_W ? [] : [["role", "Role", null, "Torvik role"], ["rec", "Recruit", 1, "Recruiting score (Torvik, 0–100)"]]).concat([
+    profile: [["cls", "Yr", null], ["ht", "Ht", null], ["pos", "Pos", null]].concat(ESPN_ONLY ? [] : [["role", "Role", null, "Torvik role"], ["rec", "Recruit", 1, "Recruiting score (Torvik, 0–100)"]]).concat([
       ["g", "G", 0], ["gs", "GS", 0, "Games started"], ["mpg", "MPG", 1], ["min_pct", "Min%", 1, "Share of team minutes"]]),
   };
   const PF = { sort: "impact", dir: -1, view: "overview", conf: "", team: "", q: "", pool: "rotation", limit: 100 };
@@ -282,7 +289,7 @@
     };
     app.innerHTML = `
       <div class="page-head"><div><h1>Players</h1>
-        <p class="sub">${P.length.toLocaleString()} D-I players this season · updated ${esc(d.updated)}. <b>Value</b> is a player's points per 100 possessions vs an average D-I player when ${he}'s on the floor: box-score plus/minus, re-based on pre-game opponent and team strength so it can't see the future, and shrunk toward a prior (${IS_W ? "last season and class" : "last season, class, recruiting"}) until minutes pile up. <b>Impact</b> also weighs how much ${he} plays. It's what ${he} adds to ${his} team's rating over a replacement-level player (value ${d.replacement}).</p></div></div>
+        <p class="sub">${P.length.toLocaleString()} ${LG} players this season · updated ${esc(d.updated)}. <b>Value</b> is a player's points per 100 possessions vs an average ${LG} player when ${he}'s on the floor: box-score plus/minus, re-based on pre-game opponent and team strength so it can't see the future, and shrunk toward a prior (${IS_PRO ? "last season and years in the league" : IS_W ? "last season and class" : "last season, class, recruiting"}) until minutes pile up. <b>Impact</b> also weighs how much ${he} plays. It's what ${he} adds to ${his} team's rating over a replacement-level player (value ${d.replacement}).</p></div></div>
       <div class="grid g2">${board("value", "Best players", "Highest Value, 15+ minutes per game")}${board("impact", "Most important players", "Highest Impact: quality × minutes")}</div>
       <div class="section controls">
         <input type="search" id="pq" placeholder="Search players or teams…" value="${esc(PF.q)}" style="width:230px" aria-label="Search players">
@@ -293,7 +300,7 @@
       </div>
       <div class="card flush tbl-wrap"><table id="ptbl" class="ratings-table"></table></div>
       <div id="pmore" style="margin-top:10px"></div>
-      <p class="note">${IS_W ? "Per-game stats and rates (usage, TS%, assist/turnover/rebound/block/steal rates) are computed from ESPN box scores." : "Per-game stats come from ESPN box scores; rates (usage, TS%, assist/turnover/rebound/block/steal rates, ORtg) from barttorvik.com."} Shading is a percentile among players in the current filter. ✚ = on an injury report.</p>`;
+      <p class="note">${ESPN_ONLY ? "Per-game stats and rates (usage, TS%, assist/turnover/rebound/block/steal rates) are computed from ESPN box scores." : "Per-game stats come from ESPN box scores; rates (usage, TS%, assist/turnover/rebound/block/steal rates, ORtg) from barttorvik.com."} Shading is a percentile among players in the current filter. ✚ = on an injury report.</p>`;
     const redraw = () => { PF.limit = 100; drawPlayers(P); };
     $("#pq").addEventListener("input", (e) => { PF.q = e.target.value; redraw(); });
     $("#pconf").addEventListener("change", (e) => { PF.conf = e.target.value; redraw(); });
@@ -385,7 +392,7 @@
       return `<div class="profile-row" style="grid-template-columns:110px minmax(0,1fr) 40px"><span class="lab">${lab}</span><div class="pct-track"><span style="width:${Math.max(3, 100 * (v ?? 0))}%;background:var(--accent)"></span></div><span class="small faint num" style="text-align:right">${v == null ? "" : ord(100 * v)}</span></div>`;
     }).join("");
     const r = p.rate || {};
-    const col = (p.college || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.cls || "")} at ${esc(c.team)}, ${c.season - 1}–${String(c.season).slice(2)} · similarity ${c.sim}</div></td>
+    const col = (p.college || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.cls || "")} at ${esc(c.team)}, ${seasonLabel(c.season)} · similarity ${c.sim}</div></td>
       <td class="num">${c.pick ? "#" + c.pick : "undrafted"}</td><td class="l small">${esc(c.pos || "")} · ${statLine(c.line)}</td><td class="num"><b>${fmt(c.ws, 1)}</b><div class="small faint">${c.seasons < w ? c.seasons + (c.seasons === 1 ? " season" : " seasons") + " so far" : wy}</div></td></tr>`).join("");
     const imp = IS_W ? "ws_per_40" : "bpm";
     const sty = (p.style || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.pos || "")} · ${esc(c.years.split("–")[0] === c.years.split("–")[1] ? c.years.split("–")[0] : c.years)}</div></td><td class="l small">${statLine(c.line)}</td><td class="num">${IS_W ? fmt(c[imp], 3) : sgn(c[imp])}</td></tr>`).join("");
@@ -602,10 +609,10 @@
     const injChip = availChip(t);
     const stat = (k, v, r) => `<div class="tile"><span class="k">${k}</span><span class="v num">${v}</span><span class="r">${r}</span></div>`;
     const tiles = [
-      stat("Power", sgn(t.power), `#${t.rank} · per 100 vs avg D-I`), stat("Adj. offense", fmt(t.eff_o), `#${t.eff_o_rank}`),
+      stat("Power", sgn(t.power), `#${t.rank} · per 100 vs avg ${LG}`), stat("Adj. offense", fmt(t.eff_o), `#${t.eff_o_rank}`),
       stat("Adj. defense", fmt(t.eff_d), `#${t.eff_d_rank}`), stat("Tempo", fmt(t.adjt), `#${t.adjt_rank}`),
       stat("Dynamic rating", sgn(t.k_em), `#${t.k_em_rank} · ±${fmt(t.k_sd)}`), stat("Roster strength", fmt(t.roster), `#${t.roster_rank}`),
-      stat("Win vs avg team", pct(t.win_vs_avg), "neutral floor"), stat("Win vs top 25", pct(t.win_vs_top25), "neutral floor"),
+      stat("Win vs avg team", pct(t.win_vs_avg), "neutral floor"), stat(`Win vs top ${TOPN}`, pct(t.win_vs_top25), "neutral floor"),
     ].join("");
     const profile = [
       ["Shooting (eFG%)", "efg_o", false, "efg_d", true], ["Turnovers", "tov_o", true, "tov_d", false],
@@ -638,7 +645,7 @@
     let identityHtml = "", styleHtml = "";
     if (card && STYLE) {
       const strong = new Set((card.traits || []).map((x) => x.block + ":" + x.idx));
-      const seasonSel = seasons ? `<select id="idseason" aria-label="Identity season">${seasons.seasons.slice().reverse().map((s) => `<option value="${s}" ${s === idSeason ? "selected" : ""}>${s - 1}–${String(s).slice(2)}</option>`).join("")}</select>` : "";
+      const seasonSel = seasons ? `<select id="idseason" aria-label="Identity season">${seasons.seasons.slice().reverse().map((s) => `<option value="${s}" ${s === idSeason ? "selected" : ""}>${seasonLabel(s)}</option>`).join("")}</select>` : "";
       identityHtml = `<div class="section card"><div class="section-head"><h2 style="margin:0">Identity <span class="conf-badge conf-${card.confidence.level}" title="${esc(card.confidence.notes.join(" · "))}">${card.confidence.level} confidence</span></h2>${seasonSel}</div>
         <p class="headline" style="margin-top:0">${esc(card.headline)}</p>
         <div class="identity">${BLOCKS.map(([b, lab]) => idCard(card, b, lab)).join("")}</div></div>
@@ -652,8 +659,8 @@
           <div class="card"><h2>Recent changes &amp; context</h2><ul class="clean warn">${card.changes.map((s) => `<li>${esc(s)}</li>`).join("") || "<li class='empty muted'>No significant style shift in recent games.</li>"}</ul>
             <ul class="clean arrow" style="margin-top:10px">${card.context.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div></div>`;
       styleHtml = `<div class="section grid g3">${BLOCKS.map(([b, lab]) => `<div class="card"><h2>${lab} dimensions</h2><p class="note" style="margin-top:-4px">Percentile vs all team-seasons; band = uncertainty${card.recent ? "; small orange dot = last ~8 games" : ""}; ● = signature trait.</p><div class="sliders">${STYLE.blocks[b].factors.map((f, i) => slider(f, card.blocks[b].scores[i], card.blocks[b].sd[i], card.blocks[b].pct[i], strong.has(b + ":" + i), card.recent ? card.recent[b][i] : null, "r")).join("")}</div></div>`).join("")}</div>
-        <div class="section card"><h2>Supporting evidence</h2><p class="note" style="margin-top:-4px">Opponent- and venue-adjusted play-by-play stats behind the identity, vs the D-I average that season.</p>
-          <div class="tbl-wrap"><table class="evidence"><thead><tr><th class="l nosort">Stat</th><th class="nosort">${esc(t.abbr || name)}</th><th class="nosort">D-I avg</th><th class="l nosort">Percentile</th></tr></thead><tbody>${(card.evidence || []).map((e) => `<tr><td class="l">${esc(e.label)}</td><td class="num">${esc(e.value)}</td><td class="num faint">${esc(e.avg)}</td><td class="l"><span class="minibar"><i style="width:${e.pct}%"></i></span> <span class="small faint num">${ord(e.pct)}</span></td></tr>`).join("")}</tbody></table></div></div>`;
+        <div class="section card"><h2>Supporting evidence</h2><p class="note" style="margin-top:-4px">Opponent- and venue-adjusted play-by-play stats behind the identity, vs the ${LG} average that season.</p>
+          <div class="tbl-wrap"><table class="evidence"><thead><tr><th class="l nosort">Stat</th><th class="nosort">${esc(t.abbr || name)}</th><th class="nosort">${LG} avg</th><th class="l nosort">Percentile</th></tr></thead><tbody>${(card.evidence || []).map((e) => `<tr><td class="l">${esc(e.label)}</td><td class="num">${esc(e.value)}</td><td class="num faint">${esc(e.avg)}</td><td class="l"><span class="minibar"><i style="width:${e.pct}%"></i></span> <span class="small faint num">${ord(e.pct)}</span></td></tr>`).join("")}</tbody></table></div></div>`;
     } else if (ids) {
       identityHtml = `<div class="section card"><h2>Identity</h2><p class="muted">No style profile for this season (needs enough play-by-play games).</p></div>`;
     }
@@ -669,11 +676,11 @@
       ${identityHtml}
       <div class="section grid g2">
         <div class="card"><h2>Rating through the season</h2><p class="note" style="margin-top:-4px">Adjusted efficiency margin (AdjEM) before each game day.</p><div class="chart" id="hist"></div></div>
-        <div class="card"><h2>Four factors &amp; style, percentile</h2>${profileHtml}<p class="note">Bars are percentiles among D-I teams (longer = better; gray = no better/worse direction).</p></div>
+        <div class="card"><h2>Four factors &amp; style, percentile</h2>${profileHtml}<p class="note">Bars are percentiles among ${LG} teams (longer = better; gray = no better/worse direction).</p></div>
       </div>
       ${styleHtml}
       <div class="section grid g2 top">
-        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability <a class="small" style="font-weight:500" href="#/players?team=${encodeURIComponent(name)}">all stats →</a></h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average D-I player (box score + prior). Avail = chance ${he} plays next game (${IS_W ? "recent missed games, overrides" : "injury reports, recent missed games"}).</p></div>
+        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability <a class="small" style="font-weight:500" href="#/players?team=${encodeURIComponent(name)}">all stats →</a></h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average ${LG} player (box score + prior). Avail = chance ${he} plays next game (${IS_W ? "recent missed games, overrides" : "injury reports, recent missed games"}).</p></div>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Yr</th><th class="nosort hide-sm">Ht</th><th class="nosort">MPG</th><th class="nosort">Value</th><th class="nosort hide-sm">Off</th><th class="nosort hide-sm">Def</th><th class="nosort">Avail</th></tr></thead><tbody>${roster}</tbody></table></div></div>
         <div class="card flush"><div style="padding:16px 20px 6px"><h2>Schedule</h2></div>
           <div class="tbl-wrap"><table><tbody>${sched}</tbody></table></div></div>
@@ -785,14 +792,15 @@
     const xa = build(A), xb = build(B);
     const same = VEC.conf[A] && VEC.conf[A] === VEC.conf[B] ? 1 : 0;
     const ncaa = opts.type === "ncaa" ? 1 : 0;
-    const ctx = [opts.loc, opts.loc === 0 ? 1 : 0, ncaa, opts.type === "conf" ? 1 : 0, ncaa, same, (ncaa ? 138 : VEC.day) / 100];
+    const ctx = [opts.loc, opts.loc === 0 ? 1 : 0, ncaa, opts.type === "conf" ? 1 : 0, ncaa, same, (ncaa ? (VEC.post_day ?? 138) : VEC.day) / 100];
     const mus = [], sg2 = [];
     for (const net of MODEL.nets) { const [m, s] = netForward(net, xa, xb, ctx); mus.push(m); sg2.push(s * s); }
     const muN = mus.reduce((a, b) => a + b, 0) / mus.length;
     const sgN = Math.sqrt(sg2.reduce((a, b) => a + b, 0) / sg2.length + mus.reduce((a, b) => a + (b - muN) ** 2, 0) / mus.length);
     // linear game model (dynamic + snapshot ratings, site, travel, availability)
     const ra = VEC.raw[A], rb = VEC.raw[B], L = MODEL.linear;
-    const poss = Math.max(55, Math.min(85, MODEL.mu_t + ra.k_t + rb.k_t));
+    const [pLo, pHi] = MODEL.poss_range || [55, 85];
+    const poss = Math.max(pLo, Math.min(pHi, MODEL.mu_t + ra.k_t + rb.k_t));
     const x = {
       k_margin: ((ra.k_o - ra.k_d) - (rb.k_o - rb.k_d)) * poss / 100, r_margin: ((ra.adjem ?? 0) - (rb.adjem ?? 0)) * poss / 100,
       loc: opts.loc, travel: Math.log1p(dist(B)) - Math.log1p(dist(A)), rest: 0, avail: ((ra.avail ?? 0) - (rb.avail ?? 0)) * poss / 100,
@@ -845,7 +853,7 @@
     const ids = await identities();
     const names = Object.keys(VEC.teams).filter((n) => T[n]).sort((a, b) => T[a].rank - T[b].rank);
     const st = { a: params.get("a") && T[params.get("a")] ? params.get("a") : names[0], b: params.get("b") && T[params.get("b")] ? params.get("b") : names[1],
-      site: params.get("site") || "neutral", type: params.get("type") || "ncaa" };
+      site: params.get("site") || (IS_PRO ? "a" : "neutral"), type: params.get("type") || (IS_PRO ? "reg" : "ncaa") };
     if (st.a === st.b) st.b = names.find((n) => n !== st.a);
     app.innerHTML = `
       <div class="page-head"><div><h1>Matchup Lab</h1><p class="sub">Any two teams, any site. The full game model runs in your browser: the matchup network, the dynamic-rating linear model, travel to the venue, injuries and style.</p></div></div>
@@ -854,7 +862,8 @@
         <div class="controls" style="margin:12px 0 0">
           <select id="site" aria-label="Site"><option value="neutral">Neutral site (no travel)</option><option value="a">Team A home</option><option value="b">Team B home</option>
             ${VEC.venues.map((v, i) => `<option value="v${i}">${esc(v.group)}: ${esc(v.city)}</option>`).join("")}</select>
-          <select id="gtype" aria-label="Game type"><option value="ncaa">NCAA tournament</option><option value="reg">Regular season</option><option value="conf">Conference tournament</option></select>
+          <select id="gtype" aria-label="Game type">${IS_PRO ? `<option value="reg">Regular season</option><option value="ncaa">Playoffs</option>${LEAGUE === "nba" ? `<option value="conf">Play-in</option>` : ""}`
+              : `<option value="ncaa">NCAA tournament</option><option value="reg">Regular season</option><option value="conf">Conference tournament</option>`}</select>
           <button class="icon-btn" id="swap" title="Swap teams" style="width:auto;padding:0 12px">⇄ swap</button>
         </div>
       </div>
@@ -929,7 +938,34 @@
           <p class="note">Matchup edge = the neutral-site regular-season margin minus the gap in Power ratings: what these two teams' specific interaction adds beyond overall strength.</p></div>
         <div class="card"><h2>${esc(A)} offense vs ${esc(B)} defense</h2>${duelHtml(ta, tb, A, B)}<h2 style="margin-top:16px">${esc(B)} offense vs ${esc(A)} defense</h2>${duelHtml(tb, ta, B, A)}</div>
       </div>
+      ${IS_PRO ? seriesHtml(A, B, st.type) : ""}
       ${styleCmp}`;
+  }
+
+  // best-of-N series from the two home/away game probabilities and the league's home pattern
+  function seriesProb(ph, pa, n, sites, wa = 0, wb = 0) {
+    const need = Math.floor(n / 2) + 1, memo = {};
+    const f = (a, b) => {
+      if (a >= need) return 1;
+      if (b >= need) return 0;
+      const k = a + "," + b;
+      if (!(k in memo)) { const p = sites[a + b] ? ph : pa; memo[k] = p * f(a + 1, b) + (1 - p) * f(a, b + 1); }
+      return memo[k];
+    };
+    return f(wa, wb);
+  }
+  function seriesHtml(A, B, type) {
+    const fmtc = (VEC.playoff_format || {}), lens = [...new Set(fmtc.rounds || [7])].sort((x, y) => x - y);
+    const pat = (n) => ((fmtc.patterns || {})[n] || [1, 1, 0, 0, 1, 0, 1].slice(0, n));
+    const t = type === "reg" ? "ncaa" : type;
+    const aHome = predict(A, B, { loc: 1, type: t, venue: null }).p, aAway = predict(A, B, { loc: -1, type: t, venue: null }).p;
+    const rows = lens.map((n) => {
+      const pA = seriesProb(aHome, aAway, n, pat(n)), pB = 1 - seriesProb(1 - aAway, 1 - aHome, n, pat(n));
+      return `<tr><td class="l">Best of ${n}</td><td class="num"><b>${pct(pA, 1)}</b></td><td class="num">${pct(pB, 1)}</td></tr>`;
+    }).join("");
+    return `<div class="section card"><h2>Playoff series</h2><p class="note" style="margin-top:-4px">P(${esc(A)} wins the series), priced game by game at each arena with playoff context. Game ${esc(A)} hosts: ${pct(aHome, 1)} · game ${esc(B)} hosts: ${pct(aAway, 1)} for ${esc(A)}.</p>
+      <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Series</th><th class="nosort">${esc(A)} has home court</th><th class="nosort">${esc(B)} has home court</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Home pattern ${lens.map((n) => `best-of-${n}: ${pat(n).map((x) => (x ? "H" : "A")).join("")}`).join(" · ")} (H = the team with home court hosts).</p></div>`;
   }
 
   // ================================================================ GAMES
@@ -960,7 +996,7 @@
         <span class="r pre small ${ok ? "pos" : "neg"}">${ok ? "✓" : "✗"} pre ${pct(Math.max(x.p_a, 1 - x.p_a))}</span></div>`;
     };
     app.innerHTML = `
-      <div class="page-head"><div><h1>Games</h1><p class="sub">Forecasts for the next week of D-I games, and how this season's pre-game forecasts have done. The current season is never used to train the model, so these numbers are out-of-sample.</p></div></div>
+      <div class="page-head"><div><h1>Games</h1><p class="sub">Forecasts for the next week of ${LG} games, and how this season's pre-game forecasts have done. The current season is never used to train the model, so these numbers are out-of-sample.</p></div></div>
       ${acc ? `<div class="tiles">
         <div class="tile"><span class="k">Games this season</span><span class="v num">${acc.n.toLocaleString()}</span></div>
         <div class="tile"><span class="k">Winners called</span><span class="v num">${pct(acc.accuracy, 1)}</span></div>
@@ -976,7 +1012,7 @@
         const ys = xs.filter((x) => !q || x.team_a.toLowerCase().includes(q) || x.team_b.toLowerCase().includes(q))
           .sort((a, b) => ((T[a.team_a] || {}).rank || 999) + ((T[a.team_b] || {}).rank || 999) - ((T[b.team_a] || {}).rank || 999) - ((T[b.team_b] || {}).rank || 999));
         return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
-      }).join("") || `<p class="faint">No D-I games scheduled in the next week${q ? " for that filter" : ""}.</p>`;
+      }).join("") || `<p class="faint">No ${LG} games scheduled in the next week${q ? " for that filter" : ""}.</p>`;
     };
     $("#gq").addEventListener("input", draw);
     draw();
@@ -993,10 +1029,10 @@
     const M = (b) => STYLE.blocks[b];
     app.innerHTML = `
       <section class="hero"><div><h1>How every team plays, separate from how good it is</h1>
-          <p>Each D-I team gets an offensive, defensive and personnel identity from play-by-play: shot locations, ball movement, pace, pressure, rebounding and roster build. Team strength is regressed out first, so these are styles, not rankings. <a href="#/guide">Style guide →</a></p></div>
+          <p>Each ${LG} team gets an offensive, defensive and personnel identity from play-by-play: shot locations, ball movement, pace, pressure, rebounding and roster build. Team strength is regressed out first, so these are styles, not rankings. <a href="#/guide">Style guide →</a></p></div>
         <div class="kpis"><div class="tile"><span class="v">${d.teams.length}</span><span class="k">teams profiled</span></div><div class="tile"><span class="v">${M("offense").factors.length + M("defense").factors.length + M("roster").factors.length}</span><span class="k">style dimensions</span></div><div class="tile"><span class="v">${M("offense").archetypes.length + M("defense").archetypes.length + M("roster").archetypes.length}</span><span class="k">archetypes</span></div></div></section>
       <section class="section card"><div class="section-head"><h2 style="margin:0">Style map</h2>
-          <select id="season" aria-label="Season">${seasons.seasons.slice().reverse().map((x) => `<option value="${x}" ${x === s ? "selected" : ""}>${x - 1}–${String(x).slice(2)}</option>`).join("")}</select></div>
+          <select id="season" aria-label="Season">${seasons.seasons.slice().reverse().map((x) => `<option value="${x}" ${x === s ? "selected" : ""}>${seasonLabel(x)}</option>`).join("")}</select></div>
         <div class="controls"><label class="small faint" for="mx">X</label><select id="mx"></select><label class="small faint" for="my">Y</label><select id="my"></select><input type="search" id="mq" placeholder="Find a team…" style="flex:1;min-width:140px" aria-label="Find a team"></div>
         <div class="controls"><span class="small faint">Highlight an archetype:</span><div class="chips" id="mchips"></div></div>
         <div class="map-wrap" id="map"></div>
@@ -1078,8 +1114,75 @@
         }).join("")}</div></section>`).join("")}`;
   }
 
+  // ================================================================ PLAYOFFS (NBA / WNBA)
+  async function viewPlayoffs() {
+    const [d] = await Promise.all([get("playoffs.json"), teams()]);
+    const R = d.rounds, nR = R.length, done = d.phase === "complete", inPost = d.phase === "postseason";
+    const byConf = !!d.format.by_conference, playIn = !!d.format.play_in;
+    const usePre = done && d.teams.some((t) => t.pre_title != null);
+    const P = (t) => (usePre ? { title: t.pre_title, round: t.pre_round } : { title: t.p_title, round: t.p_round });
+    const heat = (v) => `<span class="heat num" style="background:color-mix(in srgb, var(--accent) ${Math.round(Math.min(1, v || 0) * 45)}%, transparent)">${v == null ? "–" : v < 0.005 ? (v > 0 ? "<1%" : "–") : v > 0.995 && v < 1 ? ">99%" : pct(v)}</span>`;
+    const short = (n) => (/^W?NBA Finals$/.test(n) ? "Finals" : n.replace("Conference ", "Conf. "));
+    const head = `<thead><tr><th class="l nosort">Team</th><th class="nosort">Record</th>${done || inPost ? "" : `<th class="nosort" title="Average final record in the simulations (10th-90th percentile wins)">Projected</th>`}
+      ${playIn && !(done || inPost) ? `<th class="nosort" title="Seeds 1-6: straight into the playoffs">Top 6</th><th class="nosort" title="Seeds 7-10">Play-in</th>` : ""}
+      <th class="nosort">${usePre ? "Playoffs" : "Playoffs"}</th>${R.slice(1).map((r) => `<th class="nosort" title="${esc(r)}">${esc(short(r))}</th>`).join("")}<th class="nosort">Title</th></tr></thead>`;
+    const row = (t) => {
+      const x = P(t), ch = d.champion === t.team;
+      const proj = `${Math.round(t.proj_w)}–${Math.round(t.g_total - t.proj_w)}<div class="small faint">${Math.round(t.w_lo)}–${Math.round(t.w_hi)} W</div>`;
+      return `<tr><td class="l">${teamLink(t.team)}${ch ? ` <span class="pill good">champion</span>` : ""}</td><td class="num">${t.w}–${t.l}</td>
+        ${done || inPost ? "" : `<td class="num">${proj}</td>`}
+        ${playIn && !(done || inPost) ? `<td>${heat(t.p_top6)}</td><td>${heat(t.p_playin)}</td>` : ""}
+        ${x.round.map((v) => `<td>${heat(v)}</td>`).join("")}<td>${heat(x.title)}</td></tr>`;
+    };
+    const groups = byConf ? [...new Set(d.teams.map((t) => t.conf))].sort() : [null];
+    const tables = groups.map((g) => {
+      const ts = d.teams.filter((t) => g == null || t.conf === g)
+        .sort((a, b) => (P(b).round[0] - P(a).round[0]) || (P(b).title - P(a).title) || (b.proj_w - a.proj_w));
+      return `<div class="card flush tbl-wrap section">${g ? `<h2 style="padding:14px 16px 0">${esc(g)}</h2>` : ""}<table class="ratings-table">${head}<tbody>${ts.map(row).join("")}</tbody></table></div>`;
+    }).join("");
+    const fav = d.teams.slice().sort((a, b) => P(b).title - P(a).title).slice(0, 8);
+    const mx = Math.max(...fav.map((t) => P(t).title), 0.01);
+    const odds = `<div class="card"><h2>${usePre ? "Title odds before the playoffs" : "Title odds"}</h2>${fav.map((t, i) => `
+      <div class="odds-row lb-row"><span class="faint num">${i + 1}</span><span class="teamcell" style="font-weight:500">${logo(TEAMS[t.team])}<span class="nm">${esc(t.team)}${d.champion === t.team ? " 🏆" : ""}</span></span>
+        <div class="pbar lb-bar"><span style="width:${(100 * P(t).title / mx).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${pct(P(t).title, 1)}</div></div>`).join("")}</div>`;
+    const champCard = done ? `<div class="card champ-card">${logo(TEAMS[d.champion], "lg")}<div><div class="kind">${esc(seasonLabel(d.season))} champion</div><h2 style="font-size:28px;margin:2px 0">${esc(d.champion)}</h2>
+      <p class="muted small">Before the playoffs the model gave them ${pct((d.teams.find((t) => t.team === d.champion) || {}).pre_title, 1)} to win the title${(() => { const o = d.teams.slice().sort((a, b) => (b.pre_title || 0) - (a.pre_title || 0)); const r = o.findIndex((t) => t.team === d.champion) + 1; return r ? `, ${ord(r)} best in the league` : ""; })()}.</p></div></div>` : "";
+    const ser = d.series || [];
+    const serRounds = [...new Set(ser.map((x) => x.round))].sort((a, b) => a - b);
+    const serHtml = ser.length ? `<div class="section"><h2>Series</h2>${serRounds.map((r) => `<h3 style="margin:14px 0 8px">${esc(R[r - 1] || "Round " + r)}</h3><div class="grid g3">${ser.filter((x) => x.round === r).map((x) => {
+        const win = x.done ? (x.w_hi > x.w_lo ? x.hi : x.lo) : null;
+        const line = (t, w, p) => `<div class="row ${win === t ? "w" : ""}" style="display:flex;align-items:center;gap:8px;padding:4px 0">${logo(TEAMS[t])}<span class="ellip" style="flex:1">${teamLink(t)}</span><b class="num">${w}</b><span class="num small faint" style="width:52px;text-align:right">${p == null ? "" : pct(p)}</span></div>`;
+        return `<div class="card">${x.conf ? `<div class="small faint">${esc(x.conf)}</div>` : ""}${line(x.hi, x.w_hi, x.done ? null : x.p_hi)}${line(x.lo, x.w_lo, x.done ? null : 1 - x.p_hi)}
+          <div class="small muted" style="margin-top:6px">Best of ${x.n}${x.done ? ` · ${esc(win)} won ${Math.max(x.w_hi, x.w_lo)}–${Math.min(x.w_hi, x.w_lo)}` : " · live odds at right"}${x.p_hi_pre != null ? ` · before game 1: ${esc(x.hi)} ${pct(x.p_hi_pre)}` : ""}</div></div>`;
+      }).join("")}</div>`).join("")}</div>` : "";
+    const bt = d.backtest;
+    const lab = { home_court: "Home-court team wins (base rate from earlier seasons)", blend: "hoop2vec blend (live model)", net: "Matchup network", net_mmai: "Matchup network (mmai features)",
+      linear: "Linear game model", kalman: "Dynamic (Kalman) rating", efficiency: "Adjusted efficiency", elo: "Elo" };
+    const btHtml = bt && bt.models ? (() => {
+      const ks = Object.keys(bt.models), best = Math.min(...ks.map((k) => bt.models[k].log_loss));
+      return `<div class="section card"><h2>Backtest: ${bt.n} playoff series, ${bt.seasons[0]}–${bt.seasons[1]}</h2>
+        <p class="note" style="margin-top:-4px">Each series predicted before game 1 by models trained only on earlier seasons, with each game priced at its arena. The team with home court won ${pct(bt.home_court_won)} of these series.</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Model</th><th class="nosort">Log loss ↓</th><th class="nosort">Brier ↓</th><th class="nosort">Accuracy ↑</th></tr></thead><tbody>
+        ${ks.sort((a, b) => bt.models[a].log_loss - bt.models[b].log_loss).map((k) => `<tr><td class="l">${esc(lab[k] || k)}</td><td class="num ${bt.models[k].log_loss === best ? "best" : ""}">${fmt(bt.models[k].log_loss, 3)}</td><td class="num">${fmt(bt.models[k].brier, 3)}</td><td class="num">${pct(bt.models[k].accuracy, 1)}</td></tr>`).join("")}</tbody></table></div></div>`;
+    })() : "";
+    const phaseTxt = done ? `The ${esc(seasonLabel(d.season))} season is over. Odds below are what the model expected before the first round, with the same models the site uses now (trained on earlier seasons).`
+      : inPost ? "The playoffs are under way. Every game played is locked in, and each series is priced from its current score."
+      : `${d.remaining_games.toLocaleString()} regular-season games left. Each one is priced by the game model at its arena, and the rest of the season is played out ${d.n_sims.toLocaleString()} times.`;
+    app.innerHTML = `<div class="page-head"><div><h1>${esc(seasonLabel(d.season))} ${LEAGUE.toUpperCase()} Playoffs</h1>
+      <p class="sub">${phaseTxt} ${byConf ? "Seeds come from the standings in each conference, with the play-in for seeds 7 to 10." : "The top eight teams overall make the playoffs, regardless of conference."} Series are best-of-${[...new Set(d.format.rounds)].join("/")} with home court to the better seed, and each series is solved exactly from its two home and away game probabilities. Updated ${esc(d.updated || "")}.</p></div></div>
+      ${done ? `<div class="grid g2">${champCard}${odds}</div>` : odds}
+      ${tables}
+      ${serHtml}
+      ${btHtml}
+      <div class="section prose" style="max-width:none"><h2>How the playoff odds work</h2>
+        <p>Each simulation plays out every remaining regular-season game with the game model's win probability. Team strength isn't fixed: each simulated season shifts every team up or down by a random amount, sized from history (how much ratings moved between this point of a season and its end). Early in the season that spread is wide; by April it's small.</p>
+        <p>Ties in the standings go to head-to-head record among the tied teams, then ${byConf ? "conference record, then" : ""} a coin flip. The official rules have a few more steps, which rarely decide anything. Once the regular season ends, the official seeds replace the simulated ones.</p>
+        <p>${byConf ? "The play-in is three single games: 7 hosts 8 (winner is the 7 seed), 9 hosts 10, and the loser of 7-8 hosts the winner of 9-10 for the 8 seed. " : ""}A series is priced from two numbers: the chance the home-court team wins a game it hosts, and a game on the road. Those go through the series home pattern (${Object.entries(d.format.patterns || {}).map(([n, pt]) => `best-of-${n}: ${pt.map((x) => (x ? "H" : "A")).join("")}`).join(", ")}) to give the exact chance of winning the series from any score.</p></div>`;
+  }
+
   // ================================================================ METHOD
   async function viewMethod() {
+    if (IS_PRO) return viewMethodPro();
     if (IS_W) return viewMethodW();
     const bt = await get("backtest.json", true);
     let btHtml = `<p class="muted">Backtest not run yet.</p>`;
@@ -1125,8 +1228,38 @@
     };
     const lineSubs = Object.keys(bt.subsets).filter((k) => k.endsWith("line_games"));
     return `<p>Season-ahead backtest, ${bt.seasons[0]}–${bt.seasons[1]}: for every test season, each model is trained only on earlier seasons, then predicts every game from ratings as of the day before. The same games are scored for every model.</p>
-      ${table("all", "All D-I games", false)}${table("ncaa", "NCAA tournament games", false)}
+      ${table("all", IS_PRO ? "All games" : "All D-I games", false)}${table("ncaa", IS_PRO ? "Playoff games" : "NCAA tournament games", false)}
       ${lineSubs.length ? `<h3 style="margin-top:22px">Against the betting market</h3><p>${lineText}</p>${lineSubs.map((k) => table(k, k.startsWith("book") ? "Games with a sportsbook line" : "Games with an ESPN consensus line", true)).join("")}` : ""}`;
+  }
+
+  async function viewMethodPro() {
+    const bt = await get("backtest.json", true);
+    const L = LEAGUE.toUpperCase();
+    const btHtml = backtestHtml(bt, `Lines are a benchmark only, never a model input. ESPN has carried DraftKings lines for ${L} games in recent seasons. A sportsbook should beat any public-data model over a full season; the gap is the honest yardstick.`);
+    app.innerHTML = `<div class="prose">
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">The ${L} site runs the same pipeline as the college sites (point-in-time ratings, player values, a blended game model, team identities), with the bracket replaced by a playoff model built for best-of-N series.</p></div></div>
+      <h2>Backtest</h2>${btHtml}
+      <h2>1 · Data (free and public)</h2>
+      <ul>
+        <li><b>ESPN</b> public API: every ${L} game since 2008 (regular season, ${L === "NBA" ? "play-in, " : ""}playoffs), with full box scores, play-by-play, venues, standings and official playoff seeds. Exhibitions and All-Star games are dropped. Pre-game lines, where ESPN has them, are a benchmark only.</li>
+        <li><b>ESPN's injury report</b> for availability, plus recent missed games and a hand-edited <code>overrides/${LEAGUE}/injuries.yaml</code>.</li>
+        <li>Player heights and years in the league come from ESPN athlete records. Every player rate (usage, TS%, rebound/assist/block/steal rates, box plus/minus) is computed here from the box scores.</li>
+      </ul>
+      <h2>2 · Ratings</h2>
+      <p>A <b>dynamic Kalman rating</b> tracks each team's offense, defense and tempo after every game and carries over between seasons by returning minutes (trades and free agency move a lot of minutes in the pros). <b>Adjusted efficiency</b> is a recency-weighted ridge regression re-solved before every game day. Elo is kept as a baseline. The Kalman settings were re-tuned on ${L} seasons and checked on the three most recent ones; the college settings held up better there, so they stayed.</p>
+      <h2>3 · Players</h2>
+      <p>Player value is a box plus/minus fitted to this league: each game's opponent-adjusted team offense and defense (vs the opponent's <i>pre-game</i> rating, so nothing from the future leaks in) is regressed on the team's minute-weighted per-${L === "NBA" ? 48 : 40} box-score rates. A player's value is ${his} share of that fit plus the team residual. Credit for rebounds and interior shots is spread by height within each game (team totals unchanged), and values are shrunk toward a prior (last season, years in the league) until minutes pile up. Roster strength is Σ minutes share × value, and the injury report moves it before tip-off.</p>
+      <h2>4 · Team identity</h2>
+      <p>Play-by-play style rates (pace, shot locations, assisted shares, turnover types, rebounding, roster build) are opponent- and venue-adjusted, team strength is regressed out, and factor analysis plus a Gaussian mixture give named dimensions and soft archetypes, fitted on ${L} seasons.</p>
+      <h2>5 · The game model</h2>
+      <p>An antisymmetric <b>matchup network</b> (team embeddings, a pair head and a σ head, 5-seed ensemble) blended with a regularized <b>linear game model</b> on the Kalman margin, the AdjEM margin, home court, travel, rest and availability. Back-to-backs and travel matter a lot more here than in college. The blend weight comes from the backtest, and P(win) = Φ(margin/σ).</p>
+      <h2>6 · Power ratings</h2>
+      <p>Power is the blended model's round-robin on a neutral floor: average predicted margin per 100 possessions against every team, re-centered so 0 = an average ${L} team. Strength of schedule is the average Power of the opponents faced.</p>
+      <h2>7 · Playoffs</h2>
+      <p>College basketball ends in a bracket; the pros play long seasons into seeded best-of-N series, so the forecast plays out the rest of the regular season ${L === "NBA" ? "and the play-in " : ""}${(10000).toLocaleString()} times, applies the tiebreakers, and solves each series exactly from its home and away game probabilities. Every past playoff series was predicted before game 1 by models trained only on earlier seasons and scored against the result. Details are on the <a href="#/playoffs">Playoffs</a> page.</p>
+      <h2>Refresh</h2>
+      <p>The same GitHub Action runs <code>python -m hoop2vec daily --${LEAGUE}</code> every morning and retrains monthly. The site is static JSON.</p>
+    </div>`;
   }
 
   async function viewMethodW() {

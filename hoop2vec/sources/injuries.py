@@ -2,7 +2,8 @@
 
 Sources (in priority order):
 1. ``overrides/injuries.yaml`` — hand-maintained (team, player, status/availability, until)
-2. Rotowire's public injury-report JSON feed and the Covers.com injury page
+2. Men's college: Rotowire's public injury-report JSON feed and the Covers.com injury page.
+   NBA / WNBA: ESPN's public injury report. Women's college: no free feed (overrides + missed games only).
 3. Heuristic from recent missed games (applied later in players.py when nothing else known)
 """
 from __future__ import annotations
@@ -98,6 +99,27 @@ def covers() -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["player", "team", "status", "injury"])
 
 
+def espn() -> pd.DataFrame:
+    """ESPN's public injury report (NBA and WNBA; free, updated through the day). Team names come back as our team
+    keys (ESPN team id -> team directory), so they always match."""
+    from ..config import ESPN_BASE
+    try:
+        js = get(f"{ESPN_BASE}/injuries", timeout=30).json()
+        from ..espn_data import team_directory
+        d = team_directory()
+        id2team = dict(zip(d["espn_id"].astype(str), d["team"]))
+    except Exception as e:
+        print("  espn injuries:", e)
+        return pd.DataFrame(columns=["player", "team", "status", "injury"])
+    rows = []
+    for t in js.get("injuries", []):
+        team = id2team.get(str(t.get("id")), t.get("displayName"))
+        for i in t.get("injuries", []):
+            rows.append({"player": (i.get("athlete") or {}).get("displayName"), "team": team,
+                         "status": i.get("status") or "", "injury": i.get("shortComment") or ""})
+    return pd.DataFrame(rows, columns=["player", "team", "status", "injury"]).dropna(subset=["player"])
+
+
 def manual() -> pd.DataFrame:
     p = OVERRIDES / "injuries.yaml"
     if not p.exists():
@@ -124,8 +146,10 @@ def availability(meta: pd.DataFrame, players: pd.DataFrame):
     lastc = roster.groupby(["team", "last"])["pid"].agg(list)
     by_last = {k: v[0] for k, v in lastc.items() if len(v) == 1}
     out, rep = {}, []
-    from ..config import WOMENS
-    feeds = (("manual", manual()),) if WOMENS else (("covers", covers()), ("rotowire", rotowire()), ("manual", manual()))
+    from ..config import LEAGUE
+    feeds = {"womens": (("manual", manual()),),
+             "nba": (("espn", espn()), ("manual", manual())), "wnba": (("espn", espn()), ("manual", manual()))}.get(
+        LEAGUE, (("covers", covers()), ("rotowire", rotowire()), ("manual", manual())))
     for src, df in feeds:
         for r in df.itertuples():
             team = match_team(r.team) or (r.team if r.team in set(roster["team"]) else None)

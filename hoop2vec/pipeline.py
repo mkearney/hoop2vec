@@ -16,7 +16,8 @@ from . import features as F
 from . import games as D
 from . import players as PL
 from . import predict as PR
-from .config import ARTIFACTS, FIRST_SEASON, FIRST_TRAIN_SEASON, PROC, SITE_DATA, current_season, today
+from .config import (ARTIFACTS, FIRST_SEASON, FIRST_TRAIN_SEASON, POSS_RANGE, PROC, SITE_DATA, current_season,
+                     season_start, today)
 from .model import backtest as BT
 from .model import linear as LIN
 from .model import train as TR
@@ -69,9 +70,9 @@ def utcnow() -> str:
 def stage_data(refresh=True):
     from . import espn_fallback, history
     from . import lines as L
-    from .config import WOMENS
-    if WOMENS:
-        from . import womens_data
+    from .config import ESPN_DATA
+    if ESPN_DATA:
+        from . import espn_data
         cur = current_season()
         from .ingest import ingest_season, season_dir
         for s in range(FIRST_SEASON, cur):  # a fresh data cache (e.g. CI) needs the completed seasons once
@@ -81,8 +82,8 @@ def stage_data(refresh=True):
         if refresh:
             log("play-by-play + box scores (current season, ESPN)")
             ingest_season(cur)
-        log("women's games, players and conferences (ESPN)")
-        out = womens_data.build(refresh=refresh)
+        log("games, players and conferences (ESPN)")
+        out = espn_data.build(refresh=refresh)
         lines = L.collect()
         if len(lines):
             L.save(lines)
@@ -176,6 +177,12 @@ def stage_backtest(feat, seasons=None, n_models=3):
     res = BT.summarize(P, names, ref="linear")
     BT.save(res, P, "backtest")
     publish_backtest(res, P, names)
+    from .config import PRO_LEAGUE
+    if PRO_LEAGUE:  # every past playoff series, predicted before game 1 by the season-ahead models
+        from . import playoffs as PO
+        sb = PO.backtest_series(P, games, names)  # P already holds the honest blend column
+        PO.BT_PATH.write_text(json.dumps(sb, indent=1))
+        log(f"  series backtest: {sb.get('n', 0)} series")
     log(f"  blend weight on the network: {w_best}")
     return res
 
@@ -259,8 +266,10 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
 
     gcur = games[(games["season"] == season) & (games["type"] != "nond1")]
     played = gcur[gcur["played"]]
+    from .config import PRO_LEAGUE
+    rec_games = played[played["type"].isin(["conf", "nonconf"])] if PRO_LEAGUE else played  # pros: regular-season record
     rec = {}
-    for r in played.itertuples():
+    for r in rec_games.itertuples():
         for t, won in ((r.team_a, r.pts_a > r.pts_b), (r.team_b, r.pts_b > r.pts_a)):
             w, l_ = rec.get(t, (0, 0))
             rec[t] = (w + won, l_ + (not won))
@@ -302,7 +311,15 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     # ---- in-browser model (network weights + linear coefficients + team vectors)
     TR.export_web(models, norm, SITE_DATA / "model.json",
                   extra={"linear": {k: v for k, v in bundle["linear"].to_json().items()}, "w_net": bundle["w_net"],
-                         "mu_t": float(state["k_mut"].iloc[0])})
+                         "mu_t": float(state["k_mut"].iloc[0]), "poss_range": list(POSS_RANGE)})
+    from .config import PRO_LEAGUE
+    pro_extra = {}
+    if PRO_LEAGUE:  # Matchup Lab: playoff context day and the series format
+        from . import playoffs as PO
+        lp = games[(games["season"] == season - 1) & (games["type"] == "post")]
+        cfg = PO.load_config()
+        pro_extra = {"post_day": int((lp["date"].min() - pd.Timestamp(season_start(season - 1))).days) if len(lp) else 180,
+                     "playoff_format": {"rounds": cfg["rounds"], "patterns": cfg.get("patterns", {})}}
     vec_df = PR.pair_frame(state, pd.DataFrame({"team_a": state.index, "team_b": state.index, "loc": 0}))
     z = norm(TR.team_matrix(vec_df, "a", smeans))
     raw = {t: {"k_o": _clean(st.at[t, "k_o"]), "k_d": _clean(st.at[t, "k_d"]), "k_t": _clean(st.at[t, "k_t"]),
@@ -310,8 +327,8 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     write_json("vectors.json", {"features": F.TEAM_FEATS, "teams": {t: [round(float(v), 4) for v in z[i]] for i, t in enumerate(state.index)},
                                 "raw": raw, "loc": {t: [_clean(st.at[t, "lat"]), _clean(st.at[t, "lon"])] for t in st.index},
                                 "conf": {t: st.at[t, "conf"] for t in st.index},
-                                "day": int((pd.Timestamp(today()) - pd.Timestamp(f"{season - 1}-11-01")).days),
-                                "venues": venue_list()})
+                                "day": int((pd.Timestamp(today()) - pd.Timestamp(season_start(season))).days),
+                                "venues": [] if PRO_LEAGUE else venue_list(), **pro_extra})
 
     # ---- games: upcoming predictions + this season's results with pre-game forecasts
     log("game predictions")
@@ -332,10 +349,18 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     log("players")
     write_players(st, live, pg, inj_report, season)
 
-    log("bracket")
-    write_json("bracket.json", make_bracket(bundle, st, power, games, meta, season))
-
-    stage_prospects()
+    if PRO_LEAGUE:
+        log("playoffs (season simulation, play-in, series)")
+        from . import playoffs as PO
+        po = PO.publish(bundle, st, games, conf, feat, season)
+        po["backtest"] = json.loads(PO.BT_PATH.read_text()) if PO.BT_PATH.exists() else None
+        po["updated"] = utcnow()
+        write_json("playoffs.json", po)
+        log(f"  {po['phase']}: favorite {po['teams'][0]['team']} ({po['teams'][0]['p_title']:.0%})")
+    else:
+        log("bracket")
+        write_json("bracket.json", make_bracket(bundle, st, power, games, meta, season))
+        stage_prospects()
 
     from . import espn_fallback
     source = "espn" if espn_fallback.active(season) else "torvik"
@@ -650,8 +675,10 @@ def run(mode="daily"):
         stage_train(feat)
     if mode in ("backtest", "all"):
         stage_backtest(feat)
-        from . import prospects as PRO
-        PRO.run_backtest(PRO.build_table()[0])
+        from .config import PRO_LEAGUE
+        if not PRO_LEAGUE:
+            from . import prospects as PRO
+            PRO.run_backtest(PRO.build_table()[0])
     if not (feat["season"].eq(current_season()) & feat["played"]).any():
         log("no games played yet this season - keeping last published site")
         return

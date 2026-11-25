@@ -1,7 +1,7 @@
-"""Women's game data, built entirely from ESPN's public API (no Torvik).
+"""Game and player data built entirely from ESPN's public API (no Torvik): women's college, NBA and WNBA.
 
 Produces the same tables the men's pipeline gets from barttorvik.com, so everything downstream (ratings, players,
-game models, bracket, identities, prospects) runs unchanged:
+game models, bracket / playoffs, identities, prospects) runs unchanged:
 
 * games        Torvik-style games table (team_a/team_b, loc, box scores, venues, NCAA rounds/seeds) from ESPN
                scoreboards (schedule, venues, seeds) + the play-by-play ingest (team box scores).
@@ -18,12 +18,25 @@ game models, bracket, identities, prospects) runs unchanged:
 from __future__ import annotations
 
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
 
-from .config import ARTIFACTS, ESPN_SPORT, FIRST_SEASON, HIST, PROC, RAW, current_season
+from .config import (
+    ARTIFACTS,
+    ESPN_SPORT,
+    FIRST_SEASON,
+    GAME_MINUTES,
+    HIST,
+    LEAGUE,
+    PRO_LEAGUE,
+    PROC,
+    RAW,
+    REG_PERIODS,
+    current_season,
+)
 from .http import get
 
 BOX = ["fgm", "fga", "tpm", "tpa", "ftm", "fta", "orb", "drb", "trb", "ast", "stl", "blk", "tov", "pf", "pts"]
@@ -32,6 +45,15 @@ CLS = {1: "Fr", 2: "So", 3: "Jr", 4: "Sr", 5: "Sr"}
 POS_ROLE = {"G": "Combo G", "PG": "Pure PG", "SG": "Wing G", "F": "Wing F", "SF": "Wing F", "PF": "Stretch 4",
             "C": "C", "F-C": "PF/C", "C-F": "PF/C", "G-F": "Wing G", "F-G": "Wing F"}
 ATHLETES = HIST / "athletes.parquet"
+HT_RANGE = (60, 84) if LEAGUE in ("womens", "wnba") else (66, 92)   # plausible heights (inches)
+
+
+def cls_label(years: pd.Series) -> pd.Series:
+    """College: class from ESPN experience years (1=Fr .. 4+=Sr). Pros: career year, "R" for a rookie."""
+    if PRO_LEAGUE:
+        y = years.clip(lower=0)
+        return y.map(lambda v: None if pd.isna(v) else "R" if v < 1 else str(int(v) + 1))
+    return years.clip(1, 5).map(CLS)
 
 
 def _pbp_tables(season: int):
@@ -48,9 +70,51 @@ def _pbp_tables(season: int):
 
 
 # ------------------------------------------------------------------ teams / conferences
+def _past_teams(have: set) -> pd.DataFrame:
+    """Pro leagues: franchises in the game data that ESPN's current team list no longer has (relocated, sold or
+    folded), with name and logo from ESPN's team endpoint. Cached."""
+    from .config import ESPN_BASE
+    from .ingest import PBP
+    f = RAW / "past_teams.json"
+    cache = json.loads(f.read_text()) if f.exists() else {}
+    seen = {}
+    for d in sorted(PBP.glob("*/games.parquet")):
+        g = pd.read_parquet(d, columns=["home_id", "home_name", "away_id", "away_name"])
+        for side in ("home", "away"):
+            seen.update(dict(zip(g[f"{side}_id"].astype(str), g[f"{side}_name"])))
+    rows = []
+    for tid, name in seen.items():
+        if tid in have:
+            continue
+        if tid not in cache:
+            try:
+                t = get(f"{ESPN_BASE}/teams/{tid}", timeout=30).json().get("team", {})
+            except Exception:
+                t = {}
+            logos = t.get("logos") or []
+            cache[tid] = {"espn_id": tid, "location": t.get("location") or name, "name": t.get("displayName") or name,
+                          "short": t.get("shortDisplayName"), "abbr": t.get("abbreviation"), "nickname": t.get("nickname"),
+                          "color": t.get("color"), "alt_color": t.get("alternateColor"),
+                          "logo": logos[0]["href"] if logos else None}
+        rows.append(cache[tid])
+    f.write_text(json.dumps(cache))
+    return pd.DataFrame(rows)
+
+
 def team_directory() -> pd.DataFrame:
     from .sources import espn
     t = espn.teams()
+    if PRO_LEAGUE:
+        extra = _past_teams(set(t["espn_id"].astype(str)))
+        if len(extra):
+            extra = extra[~extra["name"].fillna("").str.contains(r"All-Star|Team |Stars|World|Stripes|\bConf\b|Conference",
+                                                                  case=False)
+                          & ~extra["name"].isin(["East", "West", "USA", "Rest of World"])]
+            t = pd.concat([t, extra], ignore_index=True)
+        # pro fans call teams by nickname (Lakers, Clippers, Liberty), and cities repeat (two Los Angeles teams)
+        nick = t["short"].fillna(t["nickname"]).fillna(t["name"])
+        t["team"] = np.where(nick.duplicated(keep=False), t["name"], nick)
+        return t
     loc = t["location"].fillna(t["name"])
     dup = loc.duplicated(keep=False)
     t["team"] = np.where(dup, t["name"], loc)  # unique display key (ESPN location, full name if ambiguous)
@@ -69,8 +133,9 @@ def conferences(seasons) -> pd.DataFrame:
             js = json.loads(f.read_text())
         else:
             try:
+                grp = "" if PRO_LEAGUE else "&group=50"
                 js = get(f"https://site.web.api.espn.com/apis/v2/sports/basketball/{ESPN_SPORT}/standings"
-                         f"?region=us&lang=en&contentorigin=espn&group=50&season={s}", timeout=60).json()
+                         f"?region=us&lang=en&contentorigin=espn{grp}&season={s}", timeout=60).json()
                 f.write_text(json.dumps(js))
             except Exception as e:
                 print("standings", s, e)
@@ -81,7 +146,10 @@ def conferences(seasons) -> pd.DataFrame:
             for ent in (c.get("standings") or {}).get("entries", []):
                 t = id2team.get(str(ent["team"]["id"]))
                 if t:
-                    rows.append({"season": s, "team": t, "conf": str(lab).upper() if len(str(lab)) <= 6 else lab})
+                    st = {x.get("name"): x.get("value") for x in ent.get("stats", [])}
+                    lab2 = lab.title() if PRO_LEAGUE and isinstance(lab, str) else lab
+                    rows.append({"season": s, "team": t, "conf": lab2 if PRO_LEAGUE else (str(lab).upper() if len(str(lab)) <= 6 else lab),
+                                 "seed": st.get("playoffSeed"), "w": st.get("wins"), "l": st.get("losses")})
         frames.append(pd.DataFrame(rows))
     c = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["season", "team", "conf"])
     for k in ("t_adjoe", "t_adjde", "t_barthag"):
@@ -112,7 +180,7 @@ def athletes(ids) -> pd.DataFrame:
         HIST.mkdir(parents=True, exist_ok=True)
         have.to_parquet(ATHLETES, index=False)
     have["athlete_id"] = have["athlete_id"].astype(str)
-    have["height"] = pd.to_numeric(have["height"], errors="coerce").where(lambda h: h.between(60, 84))
+    have["height"] = pd.to_numeric(have["height"], errors="coerce").where(lambda h: h.between(*HT_RANGE))
     have["exp"] = pd.to_numeric(have["exp"], errors="coerce")
     return have.drop_duplicates("athlete_id", keep="last").set_index("athlete_id")
 
@@ -123,6 +191,7 @@ def build_games(seasons, eg: pd.DataFrame, d: pd.DataFrame, conf: pd.DataFrame) 
     from .games import ncaa_region, ncaa_round
     id2team = dict(zip(d["espn_id"].astype(str), d["team"]))
     d1 = set(zip(conf["season"], conf["team"]))
+    cmap = dict(zip(zip(conf["season"], conf["team"]), conf["conf"]))
     out = []
     for s in seasons:
         e = eg[eg["season"] == s].copy()
@@ -148,13 +217,20 @@ def build_games(seasons, eg: pd.DataFrame, d: pd.DataFrame, conf: pd.DataFrame) 
                    "pts_a": pd.to_numeric(r.away_score, errors="coerce"), "pts_b": pd.to_numeric(r.home_score, errors="coerce"),
                    "loc": 0 if neutral else -1, "torvik_p_a": np.nan, "city": r.city, "state": r.state, "notes": r.notes,
                    "conf_game": str(r.conf_game) == "True", "season_type": r.season_type}
-            notes = str(r.notes or "")
+            notes = "" if pd.isna(r.notes) else str(r.notes)
             nr = ncaa_round(notes, s)
             row["ncaa_round"] = nr
             row["region"] = ncaa_region(notes)
             row["seed_a"], row["seed_b"] = (r.away_rank, r.home_rank) if nr is not None else (np.nan, np.nan)
             both_d1 = (s, ta) in d1 and (s, tb) in d1
-            row["type"] = ("post" if (nr is not None or str(r.season_type) == "3") else
+            if PRO_LEAGUE:  # season types: 1 preseason, 2 regular, 3 playoffs, 5 NBA play-in; "nond1" = not counted
+                st = int(pd.to_numeric(r.season_type, errors="coerce") or 2)
+                row["ncaa_round"], row["region"], row["seed_a"], row["seed_b"] = (0 if st == 5 else None), None, np.nan, np.nan
+                row["type"] = ("nond1" if not both_d1 or st == 1 else "post" if st == 3 else  # st 1 = preseason "conftourney" if st == 5 else
+                               "conf" if cmap.get((s, ta)) == cmap.get((s, tb)) else "nonconf")
+            else:
+                row["type"] = None
+            row["type"] = row["type"] or ("post" if (nr is not None or str(r.season_type) == "3") else
                            "conftourney" if ("tournament" in notes.lower() or "championship" in notes.lower()) else
                            "conf" if row["conf_game"] else "nonconf") if both_d1 else "nond1"
             A, B = box.get((str(r.event_id), a_id)), box.get((str(r.event_id), b_id))
@@ -168,11 +244,11 @@ def build_games(seasons, eg: pd.DataFrame, d: pd.DataFrame, conf: pd.DataFrame) 
                 pa = A.fga - A.oreb + A.tov + 0.475 * A.fta
                 pb = B.fga - B.oreb + B.tov + 0.475 * B.fta
                 row["poss"] = (pa + pb) / 2
-                n = float(per.get(str(r.event_id), 4) or 4)
-                row["ot"] = int(max(0, n - 4))
-                row["minutes"] = 200.0 + 25.0 * row["ot"]
+                n = float(per.get(str(r.event_id), REG_PERIODS) or REG_PERIODS)
+                row["ot"] = int(max(0, n - REG_PERIODS))
+                row["minutes"] = 5 * GAME_MINUTES + 25.0 * row["ot"]
             else:
-                row["poss"], row["ot"], row["minutes"] = np.nan, 0, 200.0
+                row["poss"], row["ot"], row["minutes"] = np.nan, 0, 5 * GAME_MINUTES
             row["a_won"] = bool(done and row["pts_a"] > row["pts_b"])
             out.append(row)
     g = pd.DataFrame(out)
@@ -180,11 +256,49 @@ def build_games(seasons, eg: pd.DataFrame, d: pd.DataFrame, conf: pd.DataFrame) 
         for k in BOX:
             if f"{side}_{k}" not in g:
                 g[f"{side}_{k}"] = np.nan
+    if PRO_LEAGUE:
+        g = playoff_rounds(g)
     g["ncaa_round"] = pd.to_numeric(g["ncaa_round"], errors="coerce")
-    g["is_ncaa"] = g["ncaa_round"].notna()
+    g["is_ncaa"] = g["ncaa_round"].notna() & (g["ncaa_round"] > 0 if PRO_LEAGUE else True)
     for c in ("seed_a", "seed_b"):
         g[c] = pd.to_numeric(g[c], errors="coerce").where(g["is_ncaa"])
     g = g.drop_duplicates(["season", "gid"], keep="last")
+    return g
+
+
+def _stage(note) -> str | None:
+    """'East 1st Round - Game 2' -> '1ST ROUND'; 'WNBA Finals - Game 3' -> 'WNBA FINALS' (conference and game number
+    dropped, so both conferences' series of a round share a stage)."""
+    if not isinstance(note, str) or not note.strip():
+        return None
+    n = re.sub(r"\s*-?\s*GAME\s*\d+.*$", "", note.upper())
+    n = re.sub(r"\b(EASTERN|WESTERN|EAST|WEST)\b( CONFERENCE| CONF\.?)?", "", n)
+    return re.sub(r"\s+", " ", n).strip(" -") or None
+
+
+def playoff_rounds(g: pd.DataFrame) -> pd.DataFrame:
+    """Playoff round (1 = first round ... last = Finals) and conference for every playoff game. ESPN's notes change
+    wording across years, so a round is defined by the data: each series (season + the two teams) takes its most
+    common stage label, and stages are numbered by when they start. Play-in games are round 0."""
+    g = g.copy()
+    po = g["type"] == "post"
+    g.loc[po, "series"] = [f"{s}:{'|'.join(sorted((a, b)))}" for s, a, b in zip(g.loc[po, "season"], g.loc[po, "team_a"], g.loc[po, "team_b"])]
+    g.loc[po, "game_no"] = g.loc[po, "notes"].str.extract(r"(?i)game\s*(\d+)", expand=False).astype(float)
+    g.loc[po, "stage"] = g.loc[po, "notes"].map(_stage)
+    for s, x in g[po].groupby("season"):
+        ser = x.groupby("series").agg(stage=("stage", lambda v: v.dropna().mode().iat[0] if v.notna().any() else None),
+                                      start=("date", "min"))
+        st_start = ser.dropna(subset=["stage"]).groupby("stage")["start"].min().sort_values()
+        rank = {k: i + 1 for i, k in enumerate(st_start.index)}
+        ser["round"] = ser["stage"].map(rank)
+        # a series without notes: the round whose start is closest before its own start
+        miss = ser["round"].isna()
+        for k in ser.index[miss]:
+            before = st_start[st_start <= ser.at[k, "start"]]
+            ser.at[k, "round"] = rank[before.index[-1]] if len(before) else 1
+        g.loc[x.index, "ncaa_round"] = x["series"].map(ser["round"]).to_numpy()
+        conf = x["notes"].str.extract(r"(?i)\b(east|west)", expand=False).str.title()
+        g.loc[x.index, "region"] = conf.to_numpy()
     return g
 
 
@@ -233,7 +347,7 @@ def _height_neutralize(pb: pd.DataFrame) -> dict:
     the per-inch shift chosen so the season-level height correlations match Torvik's men's BPM. In place; returns
     the shifts."""
     key = [pb["season"], pb["muid"], pb["team"]]
-    h = pb["inches"].where(pb["inches"].between(60, 84))
+    h = pb["inches"].where(pb["inches"].between(*HT_RANGE))
     wm = (h * pb["min"]).groupby(key).transform("sum") / pb["min"].where(h.notna()).groupby(key).transform("sum")
     dev = (h - wm).fillna(0.0)                       # unknown height -> no shift
     ps = pd.DataFrame({"season": pb["season"], "pid": pb["athlete_id"], "min": pb["min"], "h": h, "dev": dev,
@@ -297,8 +411,7 @@ def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame) -> pd
     ath = athletes(pb["athlete_id"].unique())
     last = pb.groupby("pid")["season"].transform("max")
     exp_now = pb["athlete_id"].map(ath["exp"])
-    cls_n = (exp_now - (last - pb["season"])).clip(1, 5)
-    pb["cls"] = cls_n.map(CLS)
+    pb["cls"] = cls_label(exp_now - (last - pb["season"]))
     pb["inches"] = pb["athlete_id"].map(ath["height"])
     gam = _height_neutralize(pb)
     cj = json.loads((ARTIFACTS / "box_value_coef.json").read_text())

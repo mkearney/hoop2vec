@@ -11,7 +11,7 @@ import pandas as pd
 
 from . import espn_fallback as espn_season
 from . import history
-from .config import PROC, current_season
+from .config import GAME_MINUTES, PROC, current_season
 from .sources import torvik
 
 K_MIN = 300.0          # prior strength in minutes for in-season player values
@@ -23,10 +23,21 @@ PART_DECAY = 0.95      # per-game recency decay for participation (mirrors ratin
 CLS_NUM = {"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}
 
 
+def cls_num(s: pd.Series) -> pd.Series:
+    """College class (Fr..Sr) or pro career year ("R" = rookie, "2", "3", ...) -> 1, 2, 3, ..."""
+    def one(x):
+        if x in CLS_NUM:
+            return CLS_NUM[x]
+        if x == "R":
+            return 1
+        return float(min(int(x), 12)) if isinstance(x, str) and x.isdigit() else np.nan
+    return s.map(one).astype("float64")
+
+
 def load_player_games(seasons, refresh_current=True) -> pd.DataFrame:
-    from .config import WOMENS
+    from .config import ESPN_DATA
     frames = []
-    if WOMENS:  # built from ESPN box scores by womens_data.build()
+    if ESPN_DATA:  # built from ESPN box scores by espn_data.build()
         return pd.concat([pd.read_parquet(PROC / f"pg_{s}.parquet") for s in seasons if (PROC / f"pg_{s}.parquet").exists()],
                          ignore_index=True)
     for s in seasons:
@@ -55,9 +66,9 @@ def load_player_games(seasons, refresh_current=True) -> pd.DataFrame:
 
 
 def load_player_seasons(seasons, refresh_current=True) -> pd.DataFrame:
-    from .config import WOMENS
+    from .config import ESPN_DATA
     frames = []
-    if WOMENS:
+    if ESPN_DATA:
         return pd.concat([pd.read_parquet(PROC / f"ps_{s}.parquet") for s in seasons if (PROC / f"ps_{s}.parquet").exists()],
                          ignore_index=True)
     for s in seasons:
@@ -87,7 +98,7 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
     ps["mins"] = pd.to_numeric(ps["mpg"], errors="coerce") * pd.to_numeric(ps["gp"], errors="coerce")
     for c in ("bpm", "obpm", "dbpm", "rec_rank"):
         ps[c] = pd.to_numeric(ps[c], errors="coerce")
-    ps["cls_n"] = ps["cls"].map(CLS_NUM)
+    ps["cls_n"] = cls_num(ps["cls"])
     prev = ps[["season", "pid", "team", "bpm", "obpm", "dbpm", "mins", "cls_n"]].copy()
     prev["season"] += 1
     prev = prev.rename(columns={"team": "prev_team", "bpm": "p_bpm", "obpm": "p_obpm", "dbpm": "p_dbpm",
@@ -112,6 +123,12 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
     else:
         b1, b0 = 0.08, -6.0
     newcomer_base = -4.5  # unranked newcomers (incl. low-major transfers w/o data)
+    from .config import PRO_LEAGUE
+    if PRO_LEAGUE:  # no recruiting ranks: newcomers start at the minute-weighted mean of past first-season players
+        new = ps[~ps.set_index(["season", "pid"]).index.isin(prev.set_index(["season", "pid"]).index)]
+        new = new[(new["season"] > ps["season"].min()) & (new["mins"] > 150) & new["bpm"].notna()]
+        if len(new) > 50:
+            newcomer_base = float(np.average(new["bpm"], weights=new["mins"]))
 
     shrink = r["p_mins"].fillna(0) / (r["p_mins"].fillna(0) + 250.0)
     bump = r["p_cls"].map(prog).fillna(0.0)
@@ -124,7 +141,7 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
                             0.6 * r["prior_v"])
     r["prior_d"] = r["prior_v"] - r["prior_o"]
     r["returning"] = (r["prev_team"] == r["team"]).fillna(False).astype(bool)
-    r["experience"] = pd.to_numeric(r["cls"].map(CLS_NUM), errors="coerce").astype("float64")
+    r["experience"] = cls_num(r["cls"])
     return r[["season", "pid", "team", "prior_v", "prior_o", "prior_d", "returning", "experience",
               "inches", "p_mins", "rec_rank"]]
 
@@ -151,7 +168,7 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         g[["season", "date", "gid", "team_a", "played", "minutes"]].rename(columns={"team_a": "team"}),
         g[["season", "date", "gid", "team_b", "played", "minutes"]].rename(columns={"team_b": "team"}),
     ])
-    long["minutes"] = long["minutes"].fillna(200.0)
+    long["minutes"] = long["minutes"].fillna(5 * GAME_MINUTES)
     pgi = pg[pg["min"] > 0]
     pg_by = {k: v for k, v in pgi.groupby(["season", "team"])}
     cur = current_season()
@@ -213,7 +230,7 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         VD = (pdd * K + cbd) / (K + cm)
         F = np.where(cg[:, None] > 0, cm / np.maximum(cg[:, None], 1e-9), f_season[None, :])
         WF = F / np.maximum(F.sum(1, keepdims=True), 1e-9)
-        SP = np.where(cp > 0, cm / np.maximum(cp, 1) / 40.0, 0.0)
+        SP = np.where(cp > 0, cm / np.maximum(cp, 1) / GAME_MINUTES, 0.0)
         R = (F * V).sum(1)
         Ro = (F * VO).sum(1)
         Rd = (F * VD).sum(1)

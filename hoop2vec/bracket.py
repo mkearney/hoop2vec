@@ -304,7 +304,8 @@ def solve(tree: Node, bundle, state: pd.DataFrame, season: int):
         df["is_post"] = 1.0
         df["is_conftourney"] = 0.0
         date = pd.Timestamp(ROUND_DATES_2027[node.round]).replace(year=season)
-        df["day"] = (date - pd.Timestamp(f"{season - 1}-11-01")).days
+        from .config import season_start
+        df["day"] = (date - pd.Timestamp(season_start(season))).days
         df["rest_a"] = df["rest_b"] = REST[node.round]
         pr = predict_pairs(bundle, state, df)
         dist = {}

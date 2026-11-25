@@ -24,13 +24,13 @@ TEAM_FEATS = (
 def conferences(seasons) -> pd.DataFrame:
     from . import espn_fallback as espn_season
     from . import history
-    from .config import WOMENS
-    if WOMENS:  # ESPN standings (built in womens_data); no T-Rank ratings, so no de-leak is needed or applied
+    from .config import ESPN_DATA
+    if ESPN_DATA:  # ESPN standings (built in espn_data); no T-Rank ratings, so no de-leak is needed or applied
         f = PROC / "conf.parquet"
         if f.exists():
             c = pd.read_parquet(f)
             return c[c["season"].isin(list(seasons))].reset_index(drop=True)
-        from .womens_data import conferences as wconf
+        from .espn_data import conferences as wconf
         return wconf(seasons)
 
     frames = []
@@ -252,7 +252,8 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
     feat["same_conf"] = (feat["conf_a"] == feat["conf_b"]).astype(float)
     feat["is_conftourney"] = (feat["type"] == "conftourney").astype(float)
     feat["is_post"] = ((feat["type"] == "post") | feat["is_ncaa"]).astype(float)
-    feat["day"] = (feat["date"] - pd.to_datetime((feat["season"] - 1).astype(str) + "-11-01")).dt.days
+    from .config import season_start
+    feat["day"] = (feat["date"] - pd.to_datetime(feat["season"].map(season_start))).dt.days
     feat["margin"] = feat["pts_a"] - feat["pts_b"]
     feat = feat.merge(kpre[["season", "gid", "k_mu", "k_mut"]], on=["season", "gid"], how="left")
     feat["k_mu"] = feat["k_mu"].fillna(float(keng.state["mu"]))

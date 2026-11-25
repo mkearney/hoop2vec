@@ -11,6 +11,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from ..config import GAME_MINUTES
+
 # name: (numerator expr, denominator expr, block, kind, label)
 #   block: which identity the off/def parameters feed. "both" = off param -> offense, def param -> defense.
 #   kind: "rate" (binomial-ish proportion) or "mean" (continuous average)
@@ -103,8 +105,8 @@ def team_game_table(tg: pd.DataFrame, games: pd.DataFrame, d1: set[str]) -> pd.D
     tg["game_poss"] = 0.5 * (tg["poss"] + o_poss.loc[tg.index])
     from ..config import REG_PERIODS
     n_ot = games.set_index("game_id").reindex(tg["game_id"])["n_periods"].fillna(REG_PERIODS).values - REG_PERIODS
-    tg["minutes"] = 40 + 5 * np.clip(n_ot, 0, None)
-    tg["tempo"] = tg["game_poss"] * 40 / tg["minutes"]
+    tg["minutes"] = GAME_MINUTES + 5 * np.clip(n_ot, 0, None)
+    tg["tempo"] = tg["game_poss"] * GAME_MINUTES / tg["minutes"]
     tg["two_a"] = tg["fga"] - tg["tpa"]
     tg["orb_chances"] = tg["oreb"] + tg["opp_dreb"]
     tg["p_three_a"] = tg["p_c3_a"] + tg["p_ab3_a"]

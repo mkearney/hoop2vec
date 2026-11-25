@@ -61,7 +61,8 @@ def _compact(ev: dict, qdate: dt.date) -> dict | None:
 
 
 def scoreboard(d: dt.date, groups: int = 50) -> list[dict]:
-    url = f"{BASE}/scoreboard?dates={d:%Y%m%d}&groups={groups}&limit=500"
+    from ..config import PRO_LEAGUE
+    url = f"{BASE}/scoreboard?dates={d:%Y%m%d}" + ("&limit=100" if PRO_LEAGUE else f"&groups={groups}&limit=500")
     data = get(url).json()
     return [r for ev in data.get("events", []) if (r := _compact(ev, d))]
 
@@ -75,7 +76,9 @@ def fetch_season(season: int, groups: int = 50, *, refresh_recent_days: int = 3,
     """Fetch every scoreboard date of a season (cached per date)."""
     start, end = season_dates(season)
     t = today()
-    end = min(end, t + dt.timedelta(days=lookahead_days))
+    from ..config import PRO_LEAGUE
+    if not PRO_LEAGUE:  # pros: the whole remaining schedule (the playoff model plays out the regular season)
+        end = min(end, t + dt.timedelta(days=lookahead_days))
     dates = [start + dt.timedelta(days=i) for i in range((end - start).days + 1)]
 
     def work(d: dt.date):

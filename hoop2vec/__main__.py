@@ -1,4 +1,4 @@
-"""CLI: python -m hoop2vec [daily|train|backtest|all|publish|offline|history|ingest SEASONS|site] [--mens|--womens]
+"""CLI: python -m hoop2vec [daily|train|backtest|all|publish|offline|history|ingest SEASONS|site] [--mens|--womens|--nba|--wnba]
 
 --mens (default) / --womens picks the league: data/<league>, artifacts/<league>, docs/<league>.
 
@@ -11,6 +11,7 @@ offline   like daily, but without any network refresh (uses local caches)
 history   after a season ends: refresh the committed history/ bundle
 ingest    play-by-play ingest for seasons, e.g. `ingest 2015-2026` (needed to refit identities)
 style     refit the team-identity model from the league's play-by-play seasons (`--rename` re-derives names)
+tune      tune the dynamic (Kalman) rating parameters for the league (checked on held-out recent seasons)
 site      rewrite the static page shells (docs/index.html chooser + docs/<league>/index.html)
 """
 import os
@@ -19,10 +20,9 @@ import sys
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
-    if "--womens" in sys.argv:
-        os.environ["HOOP2VEC_LEAGUE"] = "womens"
-    elif "--mens" in sys.argv:
-        os.environ["HOOP2VEC_LEAGUE"] = "mens"
+    for lg in ("mens", "womens", "nba", "wnba"):
+        if f"--{lg}" in sys.argv:
+            os.environ["HOOP2VEC_LEAGUE"] = lg
     sys.argv = [sys.argv[0]] + args
     mode = sys.argv[1] if len(sys.argv) > 1 else "daily"
     if mode == "history":
@@ -32,6 +32,10 @@ if __name__ == "__main__":
     if mode == "style":
         from .style.fit import run as fit_style
         fit_style(rename="--rename" in flags)
+        raise SystemExit(0)
+    if mode == "tune":
+        from .ratings.tune import tune
+        print(tune())
         raise SystemExit(0)
     if mode == "site":
         from .site import write

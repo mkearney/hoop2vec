@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from . import geo
-from .config import current_season, today
+from .config import POSS_RANGE, current_season, season_start, today
 from .features import TEAM_FEATS
 from .model import linear as LIN
 from .model import train as TR
@@ -73,12 +73,12 @@ def pair_frame(state: pd.DataFrame, pairs: pd.DataFrame) -> pd.DataFrame:
         if c not in p:
             p[c] = dflt
     if "day" not in p:
-        p["day"] = (pd.Timestamp(today()) - pd.Timestamp(f"{season - 1}-11-01")).days
+        p["day"] = (pd.Timestamp(today()) - pd.Timestamp(season_start(season))).days
     p["same_conf"] = (p["conf_a"] == p["conf_b"]).astype(float)
     p["played"] = False
     if "k_mut" in state:
         p["k_mut"] = float(state["k_mut"].iloc[0])
-        p["poss_exp"] = (p["k_mut"] + p["a_k_t"] + p["b_k_t"]).clip(55, 85)
+        p["poss_exp"] = (p["k_mut"] + p["a_k_t"] + p["b_k_t"]).clip(*POSS_RANGE)
         p["k_margin"] = ((p["a_k_o"] - p["a_k_d"]) - (p["b_k_o"] - p["b_k_d"])) * p["poss_exp"] / 100.0
     return p
 
@@ -165,7 +165,8 @@ def power_ratings(bundle, state: pd.DataFrame) -> pd.DataFrame:
     # same quantity. Gaps between teams (and every forecast) are unchanged; ranks are identical.
     out["power"] = out["power_net"] - out["power_net"].mean()
     out["win_vs_avg"] = P.sum(1) / (n - 1)
-    top = np.argsort(-out["power"].to_numpy())[:25]
+    from .config import PRO_LEAGUE
+    top = np.argsort(-out["power"].to_numpy())[: 8 if PRO_LEAGUE else 25]  # "top 25" in college, "top 8" in the pros
     out["win_vs_top25"] = P[:, top].mean(1)
     out = out.sort_values("power", ascending=False)
     out["rank"] = np.arange(1, n + 1)
@@ -182,7 +183,7 @@ def upcoming(bundle, state, games: pd.DataFrame, days: int = 7) -> pd.DataFrame:
     pairs = g[["team_a", "team_b", "loc", "v_lat", "v_lon", "date", "type", "gid", "city", "state"]].copy()
     pairs["is_conftourney"] = (pairs["type"] == "conftourney").astype(float)
     pairs["is_post"] = (pairs["type"] == "post").astype(float)
-    pairs["day"] = (pairs["date"] - pd.Timestamp(f"{int(state['season'].iloc[0]) - 1}-11-01")).dt.days
+    pairs["day"] = (pairs["date"] - pd.Timestamp(season_start(int(state['season'].iloc[0])))).dt.days
     last = state.get("last_date")
     df = predict_pairs(bundle, state, pairs)
     df["date"] = pairs["date"].to_numpy()

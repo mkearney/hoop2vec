@@ -2,7 +2,7 @@ name: daily-refresh
 
 on:
   schedule:
-    - cron: "23 10 * 11,12,1,2,3,4 *"   # ~5-6am ET, November through April
+    - cron: "23 10 * * *"   # ~5-6am ET, every day (college Nov-Apr, NBA Oct-Jun, WNBA May-Oct; idle leagues exit early)
   workflow_dispatch:
 
 permissions:
@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 1          # one league at a time so the two commits don't race
+      max-parallel: 1          # one league at a time so the commits don't race
       matrix:
-        league: [mens, womens]
+        league: [mens, womens, nba, wnba]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

@@ -23,7 +23,7 @@ def test_womens_ncaa_rounds_all_note_formats():
 
 
 def test_height_shift_keeps_team_totals():
-    from hoop2vec.womens_data import _height_neutralize
+    from hoop2vec.espn_data import _height_neutralize
     rng = np.random.default_rng(0)
     rows = []
     for g in range(60):
@@ -34,7 +34,7 @@ def test_height_shift_keeps_team_totals():
     pb = pd.DataFrame(rows)
     pb["obpm"] = 0.6 * (pb["inches"].fillna(70) - 72) + rng.normal(0, 2, len(pb))  # value tied to height
     pb["dbpm"] = rng.normal(0, 2, len(pb))
-    tot = lambda d: (d["obpm"] * d["min"]).groupby([d["muid"], d["team"]]).sum()  # noqa: E731
+    tot = lambda d: (d["obpm"] * d["min"]).groupby([d["muid"], d["team"]]).sum()
     before = tot(pb)
     gam = _height_neutralize(pb)
     assert gam["obpm"] > 0                                        # credit moves away from height
@@ -48,6 +48,10 @@ def test_site_pages(tmp_path, monkeypatch):
     site.write()
     home = (tmp_path / "index.html").read_text()
     assert 'href="mens/"' in home and 'href="womens/"' in home
-    for lg, other in (("mens", "womens"), ("womens", "mens")):
+    for lg in ("mens", "womens", "nba", "wnba"):
+        assert f'href="{lg}/"' in home
         page = (tmp_path / lg / "index.html").read_text()
-        assert f'data-league="{lg}"' in page and f'href="../{other}/"' in page and "../assets/app.js" in page
+        assert f'data-league="{lg}"' in page and "../assets/app.js" in page
+        assert all(f'href="../{o}/"' in page for o in ("mens", "womens", "nba", "wnba"))
+        pro = lg in ("nba", "wnba")
+        assert ('#/playoffs' in page) == pro and ('#/prospects' in page) != pro and ('#/bracket' in page) != pro

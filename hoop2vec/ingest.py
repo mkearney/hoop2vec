@@ -63,6 +63,11 @@ def ingest_season(season: int, workers: int = 8, refresh_recent: bool | None = N
     t0 = time.time()
     sched = load_schedule(season, refresh_recent)
     sched = sched[sched["completed"].astype(bool)]
+    from .config import PRO_LEAGUE
+    if PRO_LEAGUE:  # regular season (2), playoffs (3), NBA play-in (5); no preseason or All-Star exhibitions
+        st = pd.to_numeric(sched["season_type"], errors="coerce")
+        sched = sched[st.isin([2, 3, 5]) & ~sched.get("note", pd.Series("", index=sched.index)).fillna("")
+                      .str.contains("All-Star|Rising Stars|Celebrity", case=False)]
     out = season_dir(season)
     out.mkdir(parents=True, exist_ok=True)
     existing = {t: pd.read_parquet(out / f"{t}.parquet") if (out / f"{t}.parquet").exists() else None for t in TABLES}

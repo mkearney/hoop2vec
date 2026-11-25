@@ -37,8 +37,9 @@ def get_json(url: str, tries: int = 4, timeout: int = 30):
 
 
 def season_dates(season: int, end: date | None = None):
-    """Season 2026 = 2025-26. Regular season starts early Nov; tourney ends early April."""
-    d, last = date(season - 1, 11, 1), date(season, 4, 12)
+    """Every calendar day of a season (config.season_dates: Nov-Apr in college, Oct-Jun NBA, May-Oct WNBA)."""
+    from ..config import season_dates as span
+    d, last = span(season)
     if end is not None:
         last = min(last, end)
     while d <= last:
@@ -47,9 +48,12 @@ def season_dates(season: int, end: date | None = None):
 
 
 def scoreboard(day: date):
-    js = get_json(f"{BASE}/scoreboard?dates={day:%Y%m%d}&groups=50&limit=500")
+    from ..config import PRO_LEAGUE
+    js = get_json(f"{BASE}/scoreboard?dates={day:%Y%m%d}" + ("&limit=100" if PRO_LEAGUE else "&groups=50&limit=500"))
     out = []
     for e in (js or {}).get("events", []):
+        if not e.get("competitions"):  # a few old placeholder events have no game attached
+            continue
         comp = e["competitions"][0]
         st = comp.get("status", e.get("status", {})).get("type", {})
         notes = comp.get("notes") or []

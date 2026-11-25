@@ -68,7 +68,7 @@ def college(seasons=None, refresh_current: bool = False) -> pd.DataFrame:
     cur = current_season()
     seasons = seasons or list(range(FIRST, cur + 1))
     if WOMENS:
-        from .womens_data import college_players
+        from .espn_data import college_players
         c = college_players(seasons)
         dr = wnba_drafts()
         if len(dr):

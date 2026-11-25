@@ -29,43 +29,58 @@ THEME_BTN = ('<button class="icon-btn" id="theme" title="Toggle theme" aria-labe
              'width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>'
              '<path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>')
 LEAGUES = {
-    "mens": {"name": "Men's", "other": "womens", "other_name": "Women's", "pro": "NBA",
-             "src": "barttorvik.com, ESPN, Basketball-Reference, Covers, Rotowire"},
-    "womens": {"name": "Women's", "other": "mens", "other_name": "Men's", "pro": "WNBA",
-               "src": "ESPN, Basketball-Reference"},
+    "mens": {"name": "Men's", "full": "men's college basketball", "pro": "NBA",
+             "src": "barttorvik.com, ESPN, Basketball-Reference, Covers, Rotowire",
+             "blurb": "Ratings, players, NBA prospects, game forecasts, the 2027 bracket and team styles."},
+    "womens": {"name": "Women's", "full": "women's college basketball", "pro": "WNBA", "src": "ESPN, Basketball-Reference",
+               "blurb": "Ratings, players, WNBA prospects, game forecasts, the 2027 bracket and team styles."},
+    "nba": {"name": "NBA", "full": "the NBA", "src": "ESPN",
+            "blurb": "Ratings, players, playoff odds with the play-in, game forecasts and team styles."},
+    "wnba": {"name": "WNBA", "full": "the WNBA", "src": "ESPN",
+             "blurb": "Ratings, players, playoff odds, game forecasts and team styles."},
 }
+PRO_LEAGUES = ("nba", "wnba")
+NAV = [("ratings", "Ratings"), ("players", "Players"), ("prospects", "Prospects"), ("bracket", "Bracket"),
+       ("playoffs", "Playoffs"), ("matchup", "Matchup Lab"), ("games", "Games"), ("styles", "Styles"), ("method", "Method")]
+
+
+def nav(league: str) -> str:
+    skip = {"prospects", "bracket"} if league in PRO_LEAGUES else {"playoffs"}
+    return "\n".join(f'        <a href="#/{k}" data-route="{k}">{v}</a>' for k, v in NAV if k not in skip)
+
+
+def switcher(league: str) -> str:
+    return ('<nav class="leagues" aria-label="League">' + "".join(
+        f'<a href="../{lg}/"{" class=\"on\" aria-current=\"page\"" if lg == league else ""}>{L["name"]}</a>'
+        for lg, L in LEAGUES.items()) + "</nav>")
 
 
 def league_page(league: str) -> str:
     L = LEAGUES[league]
-    title = f"hoop2vec: {L['name']} College Basketball Ratings and Forecasts"
-    desc = (f"Daily {L['name'].lower()} college basketball power ratings, player values, {L['pro']} prospects, team style identities "
+    pro = league in PRO_LEAGUES
+    title = (f"hoop2vec: {L['name']} Ratings, Forecasts and Playoff Odds" if pro
+             else f"hoop2vec: {L['name']} College Basketball Ratings and Forecasts")
+    desc = (f"Daily {L['name']} power ratings, game forecasts, player values, playoff odds and team styles, from "
+            "leak-free models built on free public data." if pro else
+            f"Daily {L['full']} power ratings, player values, {L['pro']} prospects, team style identities "
             "and the 2027 NCAA bracket, from leak-free models built on free public data.")
     return HEAD.format(title=title, desc=desc, css="../assets/style.css", icon=ICON) + f'''<body data-league="{league}">
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="../">{BALL}<span>hoop2vec</span></a>
-      <span class="league-pill" title="Showing {L['name'].lower()} college basketball">{L['name']}</span>
       <nav class="nav" id="nav" aria-label="Sections">
-        <a href="#/ratings" data-route="ratings">Ratings</a>
-        <a href="#/players" data-route="players">Players</a>
-        <a href="#/prospects" data-route="prospects">Prospects</a>
-        <a href="#/bracket" data-route="bracket">Bracket</a>
-        <a href="#/matchup" data-route="matchup">Matchup Lab</a>
-        <a href="#/games" data-route="games">Games</a>
-        <a href="#/styles" data-route="styles">Styles</a>
-        <a href="#/method" data-route="method">Method</a>
+{nav(league)}
       </nav>
       <div class="top-right">
         <span class="updated" id="updated"></span>
-        <a class="switch" href="../{L['other']}/" title="Switch to {L['other_name'].lower()} college basketball">{L['other_name']} →</a>
+        {switcher(league)}
         {THEME_BTN}
       </div>
     </div>
   </header>
   <main class="wrap" id="app"><div class="loading">Loading…</div></main>
   <footer class="wrap footer">
-    <span>hoop2vec · {L['name'].lower()} college basketball · refreshed daily · free public data: {L['src']}</span>
+    <span>hoop2vec · {L['full']} · refreshed daily · free public data: {L['src']}</span>
     <a href="https://github.com/mkearney/hoop2vec">source</a>
   </footer>
   <div id="tooltip" class="tooltip" role="tooltip"></div>
@@ -76,23 +91,28 @@ def league_page(league: str) -> str:
 
 
 def chooser_page() -> str:
-    cards = "".join(f'''
+    def card(lg):
+        L = LEAGUES[lg]
+        kind = "Pro basketball" if lg in PRO_LEAGUES else f"{L['name']} college basketball"
+        return f'''
       <a class="choice card" href="{lg}/" data-league="{lg}">
-        <span class="kind">{LEAGUES[lg]['name']} college basketball</span>
-        <span class="big">{LEAGUES[lg]['name']}</span>
-        <span class="muted small">Ratings, players, {LEAGUES[lg]['pro']} prospects, game forecasts, the 2027 bracket and team styles.</span>
+        <span class="kind">{kind}</span>
+        <span class="big">{L['name']}</span>
+        <span class="muted small">{L['blurb']}</span>
         <span class="top5" id="top-{lg}"></span>
-        <span class="go">Open {LEAGUES[lg]['name'].lower()} →</span>
-      </a>''' for lg in ("mens", "womens"))
+        <span class="go">Open {L['name'] if lg in PRO_LEAGUES else L['name'].lower()} →</span>
+      </a>'''
+    cards = ('\n      <h2 class="choices-head">College</h2>' + "".join(card(lg) for lg in ("mens", "womens"))
+             + '\n      <h2 class="choices-head">Pro</h2>' + "".join(card(lg) for lg in PRO_LEAGUES))
     return HEAD.format(title="hoop2vec: College Basketball Ratings and Forecasts",
-                       desc="Daily ratings, game forecasts, player values and pro prospects for men's and women's college basketball, plus the 2027 NCAA tournaments. Built on free public data.",
+                       desc="Daily ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, plus the 2027 NCAA tournaments and pro playoff odds. Built on free public data.",
                        css="assets/style.css", icon=ICON) + f'''<body class="chooser">
   <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./">{BALL}<span>hoop2vec</span></a>
     <div class="top-right" style="margin-left:auto">{THEME_BTN}</div></div></header>
   <main class="wrap">
     <section class="choose-hero">
       <h1>College basketball ratings and forecasts</h1>
-      <p class="sub">Every Division I team gets a new rating each morning, men's and women's. The same models forecast games, value players, rank pro prospects and price out the 2027 NCAA tournament. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
+      <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">{cards}
     </section>
@@ -108,7 +128,7 @@ def chooser_page() -> str:
       try {{ localStorage.setItem("hoop2vec-theme", root.dataset.theme); }} catch (e) {{}}
     }});
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({{"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}}[c]));
-    for (const lg of ["mens", "womens"]) {{
+    for (const lg of ["mens", "womens", "nba", "wnba"]) {{
       fetch(lg + "/data/ratings.json", {{ cache: "no-cache" }}).then((r) => r.ok ? r.json() : null).then((d) => {{
         if (!d) return;
         document.getElementById("top-" + lg).innerHTML = "<b>Top 5 today</b>" + d.teams.slice(0, 5).map((t) =>

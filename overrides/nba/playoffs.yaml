@@ -1,0 +1,11 @@
+# NBA postseason format (2020-21 onward). Read by hoop2vec/playoffs.py.
+games: 82                  # regular-season games per team (unscheduled ones are filled in, see playoffs.py)
+by_conference: true        # seeds and bracket within each conference; Finals across conferences
+direct: 6                  # seeds 1-6 qualify directly
+play_in: true              # 7v8 (winner = 7 seed), 9v10, loser of 7v8 v winner of 9v10 (winner = 8 seed)
+rounds: [7, 7, 7, 7]       # best-of-N for each round
+patterns:                  # 1 = the team with home court hosts that game
+  7: [1, 1, 0, 0, 1, 0, 1] # 2-2-1-1-1
+bracket: [[1, 8], [4, 5], [3, 6], [2, 7]]  # first-round pairs in bracket order (no reseeding)
+round_names: [First round, Conference semifinals, Conference finals, NBA Finals]
+not_in_standings: "Cup (?:Championship|Final)"  # NBA Cup final doesn't count in the standings

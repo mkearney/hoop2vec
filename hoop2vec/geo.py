@@ -27,6 +27,12 @@ STATE_ABBR = {
 
 # venues outside the US-cities table (MTEs abroad, territories, odd spellings)
 MANUAL = {
+    # NBA / WNBA international and neutral sites
+    ("mexico city", ""): (19.43, -99.13), ("mexico city", "mexico"): (19.43, -99.13), ("ciudad de mexico", ""): (19.43, -99.13),
+    ("toronto", "ontario"): (43.65, -79.38), ("montreal", ""): (45.50, -73.57), ("montreal", "qc"): (45.50, -73.57),
+    ("vancouver", "british columbia"): (49.28, -123.12), ("edmonton", "ab"): (53.55, -113.49),
+    ("tokyo", ""): (35.68, 139.69), ("saitama", ""): (35.86, 139.65), ("shanghai", ""): (31.23, 121.47),
+    ("beijing", ""): (39.90, 116.40), ("manchester", ""): (53.48, -2.24),
     ("nassau", ""): (25.06, -77.35), ("paradise island", ""): (25.08, -77.32),
     ("nassau", "bahamas"): (25.06, -77.35), ("paradise island", "bahamas"): (25.08, -77.32),
     ("freeport", "bahamas"): (26.53, -78.70), ("cancun", ""): (21.16, -86.85),

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
+from ..config import GAME_MINUTES
 import scipy.sparse as sp
 from scipy.linalg import cho_factor, cho_solve
 
@@ -28,7 +30,7 @@ def team_game_rows(games: pd.DataFrame) -> pd.DataFrame:
     g = games
     rows = []
     for side, opp, s in (("a", "b", 1), ("b", "a", -1)):
-        mins = g["minutes"].fillna(200.0).clip(lower=200.0)
+        mins = g["minutes"].fillna(5 * GAME_MINUTES).clip(lower=5 * GAME_MINUTES)
         poss = g["poss"]
         fga = g[f"{side}_fga"]
         two_a = fga - g[f"{side}_tpa"]
@@ -37,7 +39,7 @@ def team_game_rows(games: pd.DataFrame) -> pd.DataFrame:
             "team": g[f"team_{side}"], "opp": g[f"team_{opp}"], "loc": g["loc"] * s,
             "pts": g[f"pts_{side}"], "opp_pts": g[f"pts_{opp}"], "poss": poss,
             "eff": 100 * g[f"pts_{side}"] / poss,
-            "pace": poss * 200.0 / mins,
+            "pace": poss * 5 * GAME_MINUTES / mins,
             "efg": 100 * (g[f"{side}_fgm"] + 0.5 * g[f"{side}_tpm"]) / fga,
             "tov": 100 * g[f"{side}_tov"] / poss,
             "orb": 100 * g[f"{side}_orb"] / (g[f"{side}_orb"] + g[f"{opp}_drb"]),
