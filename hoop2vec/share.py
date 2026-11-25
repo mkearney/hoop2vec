@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .config import ROOT, SITE_ROOT
 
-SITE_URL = os.environ.get("HOOP2VEC_SITE_URL", "https://mkearney.github.io/hoop2vec").rstrip("/")
+SITE_URL = os.environ.get("HOOP2VEC_SITE_URL", "https://hoop2vec.net").rstrip("/")
 W, H = 1200, 630
 FONTS = Path(__file__).resolve().parent / "fonts"
 LOGO_CACHE = ROOT / "data" / "logos"

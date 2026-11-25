@@ -5,7 +5,7 @@ women's college basketball, the **NBA** and the **WNBA**, plus **pro prospects**
 **2027 NCAA brackets** and **NBA / WNBA playoff odds**, built only from free public data. Every number on the site is computed point-in-time and checked for look-ahead leakage against closing
 betting lines.
 
-**Site:** https://mkearney.github.io/hoop2vec/ (GitHub Pages, served from `docs/`). The home page picks a league:
+**Site:** https://hoop2vec.net/ (GitHub Pages, served from `docs/`). The home page picks a league:
 `docs/mens/`, `docs/womens/`, `docs/nba/` and `docs/wnba/` run the same app (`docs/assets/`) on their own data
 (`docs/<league>/data/`).
 

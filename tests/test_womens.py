@@ -56,7 +56,7 @@ def test_site_pages(tmp_path, monkeypatch):
                                                                               {"team": "Spurs", "p_title": 0.1}]}))
     site.write()
     nba = (tmp_path / "nba" / "index.html").read_text()
-    assert 'property="og:image" content="https://mkearney.github.io/hoop2vec/nba/share.png?v=20261125"' in nba
+    assert 'property="og:image" content="https://hoop2vec.net/nba/share.png?v=20261125"' in nba
     assert "No. 1 today: Spurs. Title favorite: Celtics (20%)." in nba and 'name="twitter:card" content="summary_large_image"' in nba
     assert (tmp_path / "nba" / "share.png").exists() and (tmp_path / "share.png").exists()
     import re
@@ -67,7 +67,7 @@ def test_site_pages(tmp_path, monkeypatch):
     from PIL import Image
     assert Image.open(tmp_path / "nba" / "share.png").size == (1200, 630)
     home = (tmp_path / "index.html").read_text()
-    assert 'rel="canonical" href="https://mkearney.github.io/hoop2vec/"' in home and "1. Spurs" in home
+    assert 'rel="canonical" href="https://hoop2vec.net/"' in home and "1. Spurs" in home
     assert 'href="mens/"' in home and 'href="womens/"' in home
     for lg in ("mens", "womens", "nba", "wnba"):
         assert f'href="{lg}/"' in home
