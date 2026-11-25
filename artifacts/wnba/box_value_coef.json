@@ -31,8 +31,5 @@
   "r_pf": -0.1015,
   "const": -11.2348
  },
- "height_shift_per_inch": {
-  "obpm": 0.4164,
-  "dbpm": 0.3068
- }
+ "height_shift_per_inch": null
 }
