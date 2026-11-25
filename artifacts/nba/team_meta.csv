@@ -1,0 +1,31 @@
+team,espn_id,votes,share,location,name,short,abbr,nickname,color,alt_color,logo,city,state,lat,lon
+Hawks,1,1,1.0,Atlanta,Atlanta Hawks,Hawks,ATL,Atlanta,c8102e,fdb927,https://a.espncdn.com/i/teamlogos/nba/500/atl.png,Atlanta,GA,33.753094000000004,-84.354325
+Celtics,2,1,1.0,Boston,Boston Celtics,Celtics,BOS,Boston,008348,ffffff,https://a.espncdn.com/i/teamlogos/nba/500/bos.png,Boston,MA,42.357603,-71.068432
+Nets,17,1,1.0,Brooklyn,Brooklyn Nets,Nets,BKN,Brooklyn,000000,ffffff,https://a.espncdn.com/i/teamlogos/nba/500/bkn.png,Brooklyn,NY,40.68,-73.94
+Hornets,30,1,1.0,Charlotte,Charlotte Hornets,Hornets,CHA,Charlotte,008ca8,1d1060,https://a.espncdn.com/i/teamlogos/nba/500/cha.png,Charlotte,NC,35.2269,-80.8433
+Bulls,4,1,1.0,Chicago,Chicago Bulls,Bulls,CHI,Chicago,ce1141,000000,https://a.espncdn.com/i/teamlogos/nba/500/chi.png,Chicago,IL,41.885847,-87.618123
+Cavaliers,5,1,1.0,Cleveland,Cleveland Cavaliers,Cavaliers,CLE,Cleveland,860038,bc945c,https://a.espncdn.com/i/teamlogos/nba/500/cle.png,Cleveland,OH,41.4918,-81.6757
+Mavericks,6,1,1.0,Dallas,Dallas Mavericks,Mavericks,DAL,Dallas,0064b1,bbc4ca,https://a.espncdn.com/i/teamlogos/nba/500/dal.png,Dallas,TX,32.893643499999996,-96.79825149999999
+Nuggets,7,1,1.0,Denver,Denver Nuggets,Nuggets,DEN,Denver,0e2240,fec524,https://a.espncdn.com/i/teamlogos/nba/500/den.png,Denver,CO,39.758073249999995,-104.98440525000001
+Pistons,8,1,1.0,Detroit,Detroit Pistons,Pistons,DET,Detroit,1d428a,c8102e,https://a.espncdn.com/i/teamlogos/nba/500/det.png,Detroit,MI,42.347429,-83.060398
+Warriors,9,1,1.0,Golden State,Golden State Warriors,Warriors,GS,Golden State,fdb927,1d428a,https://a.espncdn.com/i/teamlogos/nba/500/gs.png,San Francisco,CA,37.698471999999995,-122.40012200000001
+Rockets,10,1,1.0,Houston,Houston Rockets,Rockets,HOU,Houston,ce0e2d,000000,https://a.espncdn.com/i/teamlogos/nba/500/hou.png,Houston,TX,29.680678,-95.4122045
+Pacers,11,1,1.0,Indiana,Indiana Pacers,Pacers,IND,Indiana,0c2340,ffd520,https://a.espncdn.com/i/teamlogos/nba/500/ind.png,Indianapolis,IN,39.8567115,-86.124144
+Clippers,12,1,1.0,LA,LA Clippers,Clippers,LAC,LA,12173f,c8102e,https://a.espncdn.com/i/teamlogos/nba/500/lac.png,Inglewood,CA,33.955048,-118.355575
+Lakers,13,1,1.0,Los Angeles,Los Angeles Lakers,Lakers,LAL,Los Angeles,552583,fdb927,https://a.espncdn.com/i/teamlogos/nba/500/lal.png,Los Angeles,CA,33.973093,-118.247896
+Grizzlies,29,1,1.0,Memphis,Memphis Grizzlies,Grizzlies,MEM,Memphis,5d76a9,12173f,https://a.espncdn.com/i/teamlogos/nba/500/mem.png,Memphis,TN,35.0337,-89.9343
+Heat,14,1,1.0,Miami,Miami Heat,Heat,MIA,Miami,98002e,000000,https://a.espncdn.com/i/teamlogos/nba/500/mia.png,Miami,FL,25.779,-80.1982
+Bucks,15,1,1.0,Milwaukee,Milwaukee Bucks,Bucks,MIL,Milwaukee,00471b,eee1c6,https://a.espncdn.com/i/teamlogos/nba/500/mil.png,Milwaukee,WI,43.0343,-87.9151
+Timberwolves,16,1,1.0,Minnesota,Minnesota Timberwolves,Timberwolves,MIN,Minnesota,266092,79bc43,https://a.espncdn.com/i/teamlogos/nba/500/min.png,Minneapolis,MN,45.016527499999995,-93.257173
+Pelicans,3,1,1.0,New Orleans,New Orleans Pelicans,Pelicans,NO,New Orleans,0a2240,b4975a,https://a.espncdn.com/i/teamlogos/nba/500/no.png,New Orleans,LA,29.9617775,-90.118127
+Knicks,18,1,1.0,New York,New York Knicks,Knicks,NY,New York,1d428a,f58426,https://a.espncdn.com/i/teamlogos/nba/500/ny.png,New York,NY,40.74838,-73.996705
+Thunder,25,1,1.0,Oklahoma City,Oklahoma City Thunder,Thunder,OKC,Oklahoma City,007ac1,ef3b24,https://a.espncdn.com/i/teamlogos/nba/500/okc.png,Oklahoma City,OK,35.40335,-97.50495000000001
+Magic,19,1,1.0,Orlando,Orlando Magic,Magic,ORL,Orlando,0150b5,9ca0a3,https://a.espncdn.com/i/teamlogos/nba/500/orl.png,Orlando,FL,28.5193515,-80.977574
+76ers,20,1,1.0,Philadelphia,Philadelphia 76ers,76ers,PHI,Philadelphia,1d428a,e01234,https://a.espncdn.com/i/teamlogos/nba/500/phi.png,Philadelphia,PA,39.990599,-75.14464799999999
+Suns,21,1,1.0,Phoenix,Phoenix Suns,Suns,PHX,Phoenix,29127a,e56020,https://a.espncdn.com/i/teamlogos/nba/500/phx.png,Phoenix,AZ,33.451,-112.0685
+Trail Blazers,22,1,1.0,Portland,Portland Trail Blazers,Trail Blazers,POR,Portland,e03a3e,000000,https://a.espncdn.com/i/teamlogos/nba/500/por.png,Portland,OR,45.46169366666667,-122.69377466666667
+Kings,23,1,1.0,Sacramento,Sacramento Kings,Kings,SAC,Sacramento,5a2d81,6a7a82,https://a.espncdn.com/i/teamlogos/nba/500/sac.png,Sacramento,CA,38.5816,-121.4933
+Spurs,24,1,1.0,San Antonio,San Antonio Spurs,Spurs,SA,San Antonio,000000,c4ced4,https://a.espncdn.com/i/teamlogos/nba/500/sa.png,San Antonio,TX,29.5563755,-98.41956300000001
+Raptors,28,1,1.0,Toronto,Toronto Raptors,Raptors,TOR,Toronto,d91244,000000,https://a.espncdn.com/i/teamlogos/nba/500/tor.png,Toronto,ON,43.65,-79.38
+Jazz,26,1,1.0,Utah,Utah Jazz,Jazz,UTAH,Utah,4e008e,79a3dc,https://a.espncdn.com/i/teamlogos/nba/500/utah.png,Salt Lake City,UT,40.755851,-111.896657
+Wizards,27,1,1.0,Washington,Washington Wizards,Wizards,WSH,Washington,e31837,002b5c,https://a.espncdn.com/i/teamlogos/nba/500/wsh.png,Washington,DC,38.912217,-77.017691

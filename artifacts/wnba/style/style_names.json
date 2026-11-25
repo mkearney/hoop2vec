@@ -1,0 +1,173 @@
+{
+ "offense": {
+  "factors": [
+   {
+    "name": "Pace & Transition",
+    "low": "Half-court grind",
+    "high": "Run-and-gun",
+    "desc": "How often possessions end in early-clock / transition shots (after steals, rebounds and even made baskets) versus long, late-clock half-court possessions.",
+    "matched": 0.97
+   },
+   {
+    "name": "Ball Movement",
+    "low": "Self-created shots",
+    "high": "Assist-driven",
+    "desc": "Share of made baskets that are assisted, at the rim, from mid-range and from three. Low = isolation / one-on-one creation.",
+    "matched": 0.96
+   },
+   {
+    "name": "Shot Diet",
+    "low": "Three-point heavy",
+    "high": "Mid-range heavy",
+    "desc": "Where the jump shots come from: the 3-point line or 2-point jumpers. Three-heavy teams also tend to crash the glass less.",
+    "matched": 0.96
+   },
+   {
+    "name": "Foul Pressure",
+    "low": "Avoids contact",
+    "high": "Draws fouls",
+    "desc": "How often the offense forces defensive fouls and gets to the line, including early in the shot clock.",
+    "matched": 0.97
+   },
+   {
+    "name": "Rim Pressure",
+    "low": "Jump-shooting",
+    "high": "Rim attack",
+    "desc": "Share of shots at the rim plus putback frequency, versus jump shots.",
+    "matched": 0.91
+   },
+   {
+    "name": "Risk Profile",
+    "low": "Ball control",
+    "high": "High-variance",
+    "desc": "Turnovers (especially live-ball) plus offensive rebounding: an aggressive, chaotic offense versus a careful one.",
+    "matched": 0.63
+   }
+  ],
+  "archetypes": [
+   {
+    "name": "Run-and-Gun",
+    "desc": "The fastest offenses in the league: early-clock shots after steals, rebounds and even made baskets, with the ball moving."
+   },
+   {
+    "name": "Patient Precision",
+    "desc": "Slow, low-turnover half-court offense that works the clock for a good jump shot. Low variance, with few empty possessions."
+   },
+   {
+    "name": "Threes & Free Throws",
+    "desc": "Lives at the three-point line and the free-throw line and skips the mid-range."
+   },
+   {
+    "name": "Grind & Crash",
+    "desc": "Slower half-court offense built on two-point shots, inside and from mid-range, that crashes the offensive glass."
+   }
+  ]
+ },
+ "defense": {
+  "factors": [
+   {
+    "name": "Transition Defense",
+    "low": "Gets back",
+    "high": "Leaky in transition",
+    "desc": "How often opponents get early-clock transition shots, after rebounds, makes or steals.",
+    "matched": 0.95
+   },
+   {
+    "name": "Zone Signature",
+    "low": "Denies passing lanes",
+    "high": "Concedes ball-movement looks",
+    "desc": "Share of opponents' baskets that are assisted. Zones give up passes and assisted shots; aggressive man defenses force one-on-one play. The clearest zone fingerprint.",
+    "matched": 0.93
+   },
+   {
+    "name": "Foul Tendency",
+    "low": "Disciplined",
+    "high": "Physical / foul-prone",
+    "desc": "Defensive fouls and opponent free-throw rate, including reach-in fouls early in the clock.",
+    "matched": 0.97
+   },
+   {
+    "name": "Mid-Range Funnel",
+    "low": "Allows rim & threes",
+    "high": "Funnels to mid-range",
+    "desc": "Share of opponent shots that are 2-point jumpers. Drop coverage and help-heavy schemes concede the mid-range to protect the rim and arc.",
+    "matched": 0.88
+   },
+   {
+    "name": "Rim vs. Arc",
+    "low": "Runs shooters off, concedes the rim",
+    "high": "Packs the paint, concedes 3s",
+    "desc": "Which shots the defense gives up: threes (pack-line style) or rim attempts (extended perimeter coverage).",
+    "matched": 0.88
+   }
+  ],
+  "archetypes": [
+   {
+    "name": "Conservative Pack-Line",
+    "desc": "The most common defense. Sits back, protects the paint and concedes threes, forcing few turnovers and allowing few mid-range jumpers."
+   },
+   {
+    "name": "Zone",
+    "desc": "The unmistakable zone fingerprint: opponents' baskets are heavily assisted, with lots of passing around the perimeter."
+   },
+   {
+    "name": "Denial Man-to-Man",
+    "desc": "Pressures the ball and denies passes: forces turnovers, allows few assisted looks, and makes opponents work deep into the shot clock."
+   },
+   {
+    "name": "Steady Middle",
+    "desc": "No strong lean either way: a little more physical than average, and funnels a few more shots to mid-range."
+   }
+  ]
+ },
+ "roster": {
+  "factors": [
+   {
+    "name": "Rotation Depth",
+    "low": "Tight rotation",
+    "high": "Deep platoon",
+    "desc": "Effective rotation size, bench minutes and how spread minutes are across lineups.",
+    "matched": 0.98
+   },
+   {
+    "name": "Who Drives It",
+    "low": "Forward-driven",
+    "high": "Guard-driven",
+    "desc": "Share of usage and rebounding by guards versus forwards and centers.",
+    "matched": 0.91
+   },
+   {
+    "name": "Post Player Type",
+    "low": "Wings & stretch bigs",
+    "high": "Traditional bigs",
+    "desc": "Minutes to back-to-the-basket posts versus wings and stretch forwards who shoot threes.",
+    "matched": 0.94
+   },
+   {
+    "name": "Star Usage",
+    "low": "Balanced scoring",
+    "high": "One-player show",
+    "desc": "How concentrated usage is in the top player.",
+    "matched": 0.92
+   }
+  ],
+  "archetypes": [
+   {
+    "name": "Small-Ball Guards",
+    "desc": "Guards carry the usage and the rebounding; undersized, with wings instead of traditional bigs."
+   },
+   {
+    "name": "Tight Rotation",
+    "desc": "Leans on a short rotation, with scoring spread around instead of one star."
+   },
+   {
+    "name": "Star System",
+    "desc": "Offense funneled through one high-usage player."
+   },
+   {
+    "name": "Forward-Led Positionless",
+    "desc": "Forwards run the offense; skilled, versatile bigs and wings with few traditional centers."
+   }
+  ]
+ }
+}

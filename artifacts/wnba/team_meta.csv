@@ -1,0 +1,18 @@
+team,espn_id,votes,share,location,name,short,abbr,nickname,color,alt_color,logo,city,state,lat,lon
+Dream,20,1,1.0,Atlanta,Atlanta Dream,Dream,ATL,Atlanta,e31837,5091cc,https://a.espncdn.com/i/teamlogos/wnba/500/atl.png,College Park,GA,33.65,-84.45
+Sky,19,1,1.0,Chicago,Chicago Sky,Sky,CHI,Chicago,5091cd,ffd520,https://a.espncdn.com/i/teamlogos/wnba/500/chi.png,Chicago,IL,41.885847,-87.618123
+Wings,3,1,1.0,Dallas,Dallas Wings,Wings,DAL,Dallas,002b5c,c4d600,https://a.espncdn.com/i/teamlogos/wnba/500/dal.png,Arlington,TX,32.6336,-97.1469
+Valkyries,129689,1,1.0,Golden State,Golden State Valkyries,Valkyries,GS,Golden State,b38fcf,000000,https://a.espncdn.com/i/teamlogos/wnba/500/gs.png,San Francisco,CA,37.698471999999995,-122.40012200000001
+Fever,5,1,1.0,Indiana,Indiana Fever,Fever,IND,Indiana,002d62,e03a3e,https://a.espncdn.com/i/teamlogos/wnba/500/ind.png,Indianapolis,IN,39.8567115,-86.124144
+Aces,17,1,1.0,Las Vegas,Las Vegas Aces,Aces,LV,Las Vegas,a7a8aa,000000,https://a.espncdn.com/i/teamlogos/wnba/500/lv.png,Las Vegas,NV,36.172082,-115.122366
+Sparks,6,1,1.0,Los Angeles,Los Angeles Sparks,Sparks,LA,Los Angeles,552583,fdb927,https://a.espncdn.com/i/teamlogos/wnba/500/la.png,Los Angeles,CA,33.973093,-118.247896
+Lynx,8,1,1.0,Minnesota,Minnesota Lynx,Lynx,MIN,Minnesota,266092,79bc43,https://a.espncdn.com/i/teamlogos/wnba/500/min.png,Minneapolis,MN,45.016527499999995,-93.257173
+Liberty,9,1,1.0,New York,New York Liberty,Liberty,NY,New York,86cebc,000000,https://a.espncdn.com/i/teamlogos/wnba/500/ny.png,Brooklyn,NY,40.68,-73.94
+Mercury,11,1,1.0,Phoenix,Phoenix Mercury,Mercury,PHX,Phoenix,3c286e,fa4b0a,https://a.espncdn.com/i/teamlogos/wnba/500/phx.png,Phoenix,AZ,33.451,-112.0685
+Fire,132052,1,1.0,Portland,Portland Fire,Fire,POR,Portland,cee5eb,000000,https://a.espncdn.com/i/teamlogos/wnba/500/por.png,Portland,OR,45.46169366666667,-122.69377466666667
+Storm,14,1,1.0,Seattle,Seattle Storm,Storm,SEA,Seattle,2c5235,fee11a,https://a.espncdn.com/i/teamlogos/wnba/500/sea.png,Seattle,WA,47.611435,-122.330456
+Tempo,131935,1,1.0,Toronto,Toronto Tempo,Tempo,TOR,Toronto,33476D,7B1B38,https://a.espncdn.com/i/teamlogos/wnba/500/tor.png,Toronto,ON,43.65,-79.38
+Mystics,16,1,1.0,Washington,Washington Mystics,Mystics,WSH,Washington,e03a3e,002b5c,https://a.espncdn.com/i/teamlogos/wnba/500/wsh.png,Washington,DC,38.912217,-77.017691
+Sun,18,1,1.0,Connecticut,Connecticut Sun,,CON,,,,https://a.espncdn.com/i/teamlogos/ncaa/500/18.png,Uncasville,CT,41.43,-72.11
+Monarchs,13,1,1.0,Sacramento,Sacramento Monarchs,,SAC,,,,https://a.espncdn.com/i/teamlogos/ncaa/500/13.png,,,,
+Comets,4,1,1.0,Houston,Houston Comets,,HOU,,,,https://a.espncdn.com/i/teamlogos/ncaa/500/4.png,,,,
