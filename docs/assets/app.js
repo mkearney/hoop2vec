@@ -1,5 +1,5 @@
-/* hoop2vec front end: one static SPA for ratings, team identities, the matchup lab, games, bracket and method.
-   Data (docs/data): meta, ratings, teams/<slug>, games, bracket, model + vectors (in-browser game model),
+/* hoop2vec front end: one static SPA for ratings, players, prospects, team identities, the matchup lab, games, bracket and method.
+   Shared by docs/mens/ and docs/womens/ (body[data-league]); each league's data lives in docs/<league>/data: meta, ratings, teams/<slug>, games, bracket, model + vectors (in-browser game model),
    style (style dictionary), season_<S> (identity cards), seasons, backtest, power_history. */
 (() => {
   "use strict";
@@ -8,6 +8,11 @@
   const app = $("#app");
   const tip = $("#tooltip");
   const cache = {};
+  // league: the same app serves the men's and women's sites
+  const IS_W = document.body.dataset.league === "womens";
+  const PRO = IS_W ? "WNBA" : "NBA";
+  const he = IS_W ? "she" : "he", his = IS_W ? "her" : "his";
+  const RATE_SRC = IS_W ? "ESPN box scores" : "Torvik";
   const ROUND_NAMES = ["Opening Round", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
   const BLOCKS = [["offense", "Offense", "of"], ["defense", "Defense", "df"], ["roster", "Personnel", "ro"]];
 
@@ -129,7 +134,7 @@
   window.addEventListener("hashchange", route);
   get("meta.json", true).then((m) => {
     if (!m) return;
-    const src = m.source !== "espn" ? "" : m.torvik_through ? ` · Torvik thru ${m.torvik_through.slice(5)}, ESPN after` : " · ESPN data (backup)";
+    const src = IS_W || m.source !== "espn" ? "" : m.torvik_through ? ` · Torvik thru ${m.torvik_through.slice(5)}, ESPN after` : " · ESPN data (backup)";
     $("#updated").textContent = `Updated ${m.updated}${src}`;
   });
 
@@ -243,17 +248,17 @@
 
   // ================================================================ PLAYERS
   const PCOLS = {
-    overview: [["impact", "Impact", 1, "Team points per 100 possessions he adds over a replacement-level player (value above replacement × minutes share)"],
+    overview: [["impact", "Impact", 1, `Team points per 100 possessions ${he} adds over a replacement-level player (value above replacement × minutes share)`],
       ["value", "Value", 1, "Points per 100 possessions vs an average D-I player when on the floor: de-leaked box plus/minus, shrunk toward a prior"],
       ["o", "Off", 1, "Offensive part of Value"], ["d", "Def", 1, "Defensive part of Value"], ["mpg", "MPG", 1, "Minutes per game"],
-      ["ppg", "PPG", 1, "Points per game (ESPN box scores)"], ["rpg", "RPG", 1], ["apg", "APG", 1], ["usg", "Usg%", 1, "Usage rate (Torvik)"],
-      ["ts", "TS%", 1, "True shooting (Torvik)"], ["avail", "Avail", 0, "Chance he plays next game"]],
+      ["ppg", "PPG", 1, "Points per game (ESPN box scores)"], ["rpg", "RPG", 1], ["apg", "APG", 1], ["usg", "Usg%", 1, `Usage rate (${RATE_SRC})`],
+      ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["avail", "Avail", 0, `Chance ${he} plays next game`]],
     scoring: [["ppg", "PPG", 1], ["fg_pct", "FG%", 1], ["tpm", "3PM", 1, "Threes made per game"], ["tp_pct", "3P%", 1], ["ft_pct", "FT%", 1],
-      ["ts", "TS%", 1, "True shooting (Torvik)"], ["efg", "eFG%", 1, "Effective FG% (Torvik)"], ["usg", "Usg%", 1], ["ortg", "ORtg", 1, "Points produced per 100 possessions used (Torvik)"]],
-    playmaking: [["apg", "APG", 1], ["tpg", "TOPG", 1, "Turnovers per game"], ["ast_pct", "Ast%", 1, "Assist rate (Torvik)"], ["to_pct", "TO%", 1, "Turnover rate (Torvik)", true],
+      ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["efg", "eFG%", 1, `Effective FG% (${RATE_SRC})`], ["usg", "Usg%", 1]].concat(IS_W ? [] : [["ortg", "ORtg", 1, "Points produced per 100 possessions used (Torvik)"]]),
+    playmaking: [["apg", "APG", 1], ["tpg", "TOPG", 1, "Turnovers per game"], ["ast_pct", "Ast%", 1, `Assist rate (${RATE_SRC})`], ["to_pct", "TO%", 1, `Turnover rate (${RATE_SRC})`, true],
       ["rpg", "RPG", 1], ["orb_pct", "OR%", 1], ["drb_pct", "DR%", 1], ["spg", "SPG", 1], ["bpg", "BPG", 1], ["stl_pct", "Stl%", 1], ["blk_pct", "Blk%", 1]],
-    profile: [["cls", "Yr", null], ["ht", "Ht", null], ["pos", "Pos", null], ["role", "Role", null, "Torvik role"], ["rec", "Recruit", 1, "Recruiting score (Torvik, 0–100)"],
-      ["g", "G", 0], ["gs", "GS", 0, "Games started"], ["mpg", "MPG", 1], ["min_pct", "Min%", 1, "Share of team minutes"]],
+    profile: [["cls", "Yr", null], ["ht", "Ht", null], ["pos", "Pos", null]].concat(IS_W ? [] : [["role", "Role", null, "Torvik role"], ["rec", "Recruit", 1, "Recruiting score (Torvik, 0–100)"]]).concat([
+      ["g", "G", 0], ["gs", "GS", 0, "Games started"], ["mpg", "MPG", 1], ["min_pct", "Min%", 1, "Share of team minutes"]]),
   };
   const PF = { sort: "impact", dir: -1, view: "overview", conf: "", team: "", q: "", pool: "rotation", limit: 100 };
   const POOLS = [["stars", "Starters (25+ mpg)"], ["rotation", "Rotation (15+ mpg)"], ["regulars", "Regulars (8+ mpg)"], ["all", "Everyone"]];
@@ -277,7 +282,7 @@
     };
     app.innerHTML = `
       <div class="page-head"><div><h1>Players</h1>
-        <p class="sub">${P.length.toLocaleString()} D-I players this season · updated ${esc(d.updated)}. <b>Value</b> is a player's points per 100 possessions vs an average D-I player when he's on the floor: box-score plus/minus, re-based on pre-game opponent and team strength so it can't see the future, and shrunk toward a prior (last season, class, recruiting) until minutes pile up. <b>Impact</b> also weighs how much he plays. It's what he adds to his team's rating over a replacement-level player (value ${d.replacement}).</p></div></div>
+        <p class="sub">${P.length.toLocaleString()} D-I players this season · updated ${esc(d.updated)}. <b>Value</b> is a player's points per 100 possessions vs an average D-I player when ${he}'s on the floor: box-score plus/minus, re-based on pre-game opponent and team strength so it can't see the future, and shrunk toward a prior (${IS_W ? "last season and class" : "last season, class, recruiting"}) until minutes pile up. <b>Impact</b> also weighs how much ${he} plays. It's what ${he} adds to ${his} team's rating over a replacement-level player (value ${d.replacement}).</p></div></div>
       <div class="grid g2">${board("value", "Best players", "Highest Value, 15+ minutes per game")}${board("impact", "Most important players", "Highest Impact: quality × minutes")}</div>
       <div class="section controls">
         <input type="search" id="pq" placeholder="Search players or teams…" value="${esc(PF.q)}" style="width:230px" aria-label="Search players">
@@ -288,7 +293,7 @@
       </div>
       <div class="card flush tbl-wrap"><table id="ptbl" class="ratings-table"></table></div>
       <div id="pmore" style="margin-top:10px"></div>
-      <p class="note">Per-game stats come from ESPN box scores; rates (usage, TS%, assist/turnover/rebound/block/steal rates, ORtg) from barttorvik.com. Shading is a percentile among players in the current filter. ✚ = on an injury report.</p>`;
+      <p class="note">${IS_W ? "Per-game stats and rates (usage, TS%, assist/turnover/rebound/block/steal rates) are computed from ESPN box scores." : "Per-game stats come from ESPN box scores; rates (usage, TS%, assist/turnover/rebound/block/steal rates, ORtg) from barttorvik.com."} Shading is a percentile among players in the current filter. ✚ = on an injury report.</p>`;
     const redraw = () => { PF.limit = 100; drawPlayers(P); };
     $("#pq").addEventListener("input", (e) => { PF.q = e.target.value; redraw(); });
     $("#pconf").addEventListener("change", (e) => { PF.conf = e.target.value; redraw(); });
@@ -344,46 +349,60 @@
   }
 
 
-  // ================================================================ NBA PROSPECTS
-  const XV = {
-    draft: [["p5", "Top 5", "pct", "P(picked in the top 5 this June)"], ["p14", "Lottery", "pct", "P(picked in the top 14)"],
-      ["p30", "1st round", "pct", "P(picked in the first round)"], ["p60", "Drafted", "pct", "P(drafted at all this June)"],
-      ["p_success", "NBA success", "pct", "P(8+ Win Shares in his first 4 NBA seasons)"], ["bpm", "BPM", 1, "Box plus/minus this season (Torvik)"],
-      ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1]],
-    success: [["p_success", "NBA success", "pct", "P(8+ Win Shares in his first 4 NBA seasons): an established rotation player"],
-      ["p_star", "Star start", "pct", "P(20+ Win Shares in his first 4 NBA seasons)"], ["exp_ws", "Exp. WS", 1, "Expected Win Shares, first 4 NBA seasons"],
-      ["p30", "1st round", "pct"], ["rate", "Comp hit rate", "rate", "Of the 25 most similar finished college careers at the same stage: share that became NBA rotation players"],
-      ["college", "Closest NBA comps", "comps", "College players with the most similar projected NBA profile at the same stage (click a row for details)"]],
-    stats: [["mpg", "MPG", 1], ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1], ["stl", "STL", 1], ["blk", "BLK", 1],
-      ["bpm", "BPM", 1], ["obpm", "OBPM", 1], ["dbpm", "DBPM", 1], ["usg", "Usg%", 1], ["ts", "TS%", 1], ["ast_pct", "Ast%", 1],
-      ["to_pct", "TO%", 1, "", true], ["blk_pct", "Blk%", 1], ["stl_pct", "Stl%", 1], ["tp_pct", "3P%", 1], ["tpa", "3PA", 1], ["rec", "Recruit", 1]],
-  };
+  // ================================================================ PRO (NBA / WNBA) PROSPECTS
+  const MONTH = IS_W ? "April" : "June";
+  let XV = {};
+  function prospectViews(d) {
+    const T = d.thresholds || [5, 14, 30, 60], sw = d.success_ws, st = d.star_ws, w = d.window;
+    const tierLab = IS_W ? ["Top " + T[0], "1st round", "Top " + T[2], "Drafted"] : ["Top 5", "Lottery", "1st round", "Drafted"];
+    const tierKey = T.map((t) => "p" + t);
+    const yrs = `${his} first ${w} ${PRO} seasons`;
+    XV = {
+      draft: tierKey.map((k, i) => [k, tierLab[i], "pct", i === 3 ? `P(drafted at all this ${MONTH})` : `P(picked in the top ${T[i]} this ${MONTH})`]).concat([
+        ["p_success", `${PRO} success`, "pct", `P(${sw}+ Win Shares in ${yrs})`], ["bpm", "BPM", 1, `Box plus/minus this season (${RATE_SRC})`],
+        ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1]]),
+      success: [["p_success", `${PRO} success`, "pct", `P(${sw}+ Win Shares in ${yrs}): an established rotation player`],
+        ["p_star", "Star start", "pct", `P(${st}+ Win Shares in ${yrs})`], ["exp_ws", "Exp. WS", 1, `Expected Win Shares, first ${w} ${PRO} seasons`],
+        [tierKey[1], tierLab[1], "pct"], ["rate", "Comp hit rate", "rate", `Of the 25 most similar finished college careers at the same stage: share that became ${PRO} rotation players`],
+        ["college", `Closest ${PRO} comps`, "comps", `College players with the most similar projected ${PRO} profile at the same stage (click a row for details)`]],
+      stats: [["mpg", "MPG", 1], ["pts", "PTS", 1], ["reb", "REB", 1], ["ast", "AST", 1], ["stl", "STL", 1], ["blk", "BLK", 1],
+        ["bpm", "BPM", 1], ["obpm", "OBPM", 1], ["dbpm", "DBPM", 1], ["usg", "Usg%", 1], ["ts", "TS%", 1], ["ast_pct", "Ast%", 1],
+        ["to_pct", "TO%", 1, "", true], ["blk_pct", "Blk%", 1], ["stl_pct", "Stl%", 1], ["tp_pct", "3P%", 1], ["tpa", "3PA", 1]].concat(IS_W ? [["ht", "Ht", 0, "Height (inches)"]] : [["rec", "Recruit", 1]]),
+    };
+    return { T, tierKey, tierLab };
+  }
   const XF = { sort: "board", dir: 1, view: "draft", q: "", cls: "", conf: "", limit: 60 };
   const XOPEN = new Set();
   const NBA_DIM = [["usg_pct", "Usage"], ["ts_pct", "True shooting"], ["tpar", "3PA rate"], ["ftr", "FT rate"], ["ast_pct", "Assist%"],
-    ["tov_pct", "Turnover%"], ["orb_pct", "Off. reb%"], ["drb_pct", "Def. reb%"], ["stl_pct", "Steal%"], ["blk_pct", "Block%"], ["bpm", "BPM"]];
+    ["tov_pct", "Turnover%"], ["orb_pct", "Off. reb%"]].concat(IS_W ? [["trb_pct", "Total reb%"], ["stl_pct", "Steal%"], ["blk_pct", "Block%"], ["ws_per_40", "WS / 40"]]
+    : [["drb_pct", "Def. reb%"], ["stl_pct", "Steal%"], ["blk_pct", "Block%"], ["bpm", "BPM"]]);
+  let XD = { window: 4, first: 2009, last: 2026 };
   const statLine = (l) => !l ? "" : `${fmt(l.pts)} pts · ${fmt(l.trb)} reb · ${fmt(l.ast)} ast${isNum(l.fg3_pct) && l.fg3a >= 0.5 ? ` · ${(100 * l.fg3_pct).toFixed(0)}% 3P` : ""}`;
   function prospectDetail(p) {
+    const w = XD.window, wy = `first ${w} yrs`;
     const prof = NBA_DIM.map(([k, lab]) => {
       const v = p.proj_pct ? p.proj_pct[k] : null;
       return `<div class="profile-row" style="grid-template-columns:110px minmax(0,1fr) 40px"><span class="lab">${lab}</span><div class="pct-track"><span style="width:${Math.max(3, 100 * (v ?? 0))}%;background:var(--accent)"></span></div><span class="small faint num" style="text-align:right">${v == null ? "" : ord(100 * v)}</span></div>`;
     }).join("");
     const r = p.rate || {};
     const col = (p.college || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.cls || "")} at ${esc(c.team)}, ${c.season - 1}–${String(c.season).slice(2)} · similarity ${c.sim}</div></td>
-      <td class="num">${c.pick ? "#" + c.pick : "undrafted"}</td><td class="l small">${esc(c.pos || "")} · ${statLine(c.line)}</td><td class="num"><b>${fmt(c.ws, 1)}</b><div class="small faint">${c.seasons < 4 ? c.seasons + (c.seasons === 1 ? " season" : " seasons") + " so far" : "first 4 yrs"}</div></td></tr>`).join("");
-    const sty = (p.style || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.pos || "")} · ${esc(c.years.split("–")[0] === c.years.split("–")[1] ? c.years.split("–")[0] : c.years)}</div></td><td class="l small">${statLine(c.line)}</td><td class="num">${sgn(c.bpm)}</td></tr>`).join("");
+      <td class="num">${c.pick ? "#" + c.pick : "undrafted"}</td><td class="l small">${esc(c.pos || "")} · ${statLine(c.line)}</td><td class="num"><b>${fmt(c.ws, 1)}</b><div class="small faint">${c.seasons < w ? c.seasons + (c.seasons === 1 ? " season" : " seasons") + " so far" : wy}</div></td></tr>`).join("");
+    const imp = IS_W ? "ws_per_40" : "bpm";
+    const sty = (p.style || []).map((c) => `<tr><td class="l"><b>${esc(c.name)}</b><div class="small faint">${esc(c.pos || "")} · ${esc(c.years.split("–")[0] === c.years.split("–")[1] ? c.years.split("–")[0] : c.years)}</div></td><td class="l small">${statLine(c.line)}</td><td class="num">${IS_W ? fmt(c[imp], 3) : sgn(c[imp])}</td></tr>`).join("");
     return `<div class="grid xdet" style="padding:6px 2px">
-      <div><h3>Projected NBA profile</h3><p class="note" style="margin:-2px 0 8px">What his college game translates to in his first NBA seasons, as a percentile among NBA players (2,000+ minutes).</p>${prof}
-        <p class="note">Comp hit rate: of the ${r.n || 25} most similar finished college careers at this stage, <b>${pct(r.nba)}</b> reached the NBA and <b>${pct(r.success)}</b> became rotation players.</p></div>
-      <div><h3>College comps → what they became</h3><p class="note" style="margin:-2px 0 8px">Past college players at the same stage whose game projected most like his. NBA line = first 4 NBA seasons.</p>
-        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Pick</th><th class="l nosort">NBA</th><th class="nosort">WS</th></tr></thead><tbody>${col || `<tr><td class="faint l" colspan="4">No comps.</td></tr>`}</tbody></table></div></div>
-      <div><h3>Plays like</h3><p class="note" style="margin:-2px 0 8px">NBA players (incl. internationals) whose actual NBA profile is closest to his projected one. Line = career average in 2009–2026.</p>
-        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">NBA player</th><th class="l nosort">Line</th><th class="nosort">BPM</th></tr></thead><tbody>${sty}</tbody></table></div></div></div>`;
+      <div><h3>Projected ${PRO} profile</h3><p class="note" style="margin:-2px 0 8px">What ${his} college game translates to in ${his} first ${PRO} seasons, as a percentile among ${PRO} players (${IS_W ? "1,000" : "2,000"}+ minutes).</p>${prof}
+        <p class="note">Comp hit rate: of the ${r.n || 25} most similar finished college careers at this stage, <b>${pct(r.nba)}</b> reached the ${PRO} and <b>${pct(r.success)}</b> became rotation players.</p></div>
+      <div><h3>College comps → what they became</h3><p class="note" style="margin:-2px 0 8px">Past college players at the same stage whose game projected most like ${his}. ${PRO} line = first ${w} ${PRO} seasons.</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Pick</th><th class="l nosort">${PRO}</th><th class="nosort">WS</th></tr></thead><tbody>${col || `<tr><td class="faint l" colspan="4">No comps.</td></tr>`}</tbody></table></div></div>
+      <div><h3>Plays like</h3><p class="note" style="margin:-2px 0 8px">${PRO} players (incl. internationals) whose actual ${PRO} profile is closest to ${his} projected one. Line = career average in ${XD.first}–${XD.last}.</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">${PRO} player</th><th class="l nosort">Line</th><th class="nosort">${IS_W ? "WS/40" : "BPM"}</th></tr></thead><tbody>${sty}</tbody></table></div></div></div>`;
   }
 
   async function viewProspects() {
     const [d] = await Promise.all([get("prospects.json"), teams()]);
     const P = d.players;
+    const { tierKey, tierLab } = prospectViews(d);
+    XD = { window: d.window, first: d.pro_first || 2009, last: d.pro_last || 2026 };
     const confs = [...new Set(P.map((p) => p.conf).filter(Boolean))].sort();
     const board = (key, title, note, fmtv) => `<div class="card"><h2>${title}</h2><p class="note" style="margin-top:-4px">${note}</p>${P.slice().sort((a, b) => b[key] - a[key]).slice(0, 10).map((p, i) => `
         <div class="odds-row lb-row"><span class="faint num">${i + 1}</span>
@@ -391,15 +410,15 @@
           <div class="pbar lb-bar"><span style="width:${(100 * p[key] / Math.max(...P.map((x) => x[key]))).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${fmtv(p)}</div></div>`).join("")}</div>`;
     const bt = d.backtest;
     app.innerHTML = `
-      <div class="page-head"><div><h1>${d.draft_year} NBA Prospects</h1>
-        <p class="sub">Two models built on every D-I player-season since 2008. The <b>draft model</b> predicts where college players will be picked this June. The <b>success model</b> predicts whether a player becomes an established NBA rotation player: ${d.success_ws}+ Win Shares in his first ${d.window} NBA seasons. Both are trained only on completed seasons and checked out-of-sample against real drafts and real NBA careers. College players only: international and G League prospects aren't modeled, so board slots run ahead of real picks. Early in the season, ratings lean on last season and recruiting.</p></div></div>
-      <div class="grid g2">${board("draft_score", "Projected draft board", "College players most likely to go early this June (P = first round)", (p) => pct(p.p30))}
-        ${board("p_success", "Best NBA bets", `P(${d.success_ws}+ Win Shares in his first ${d.window} NBA seasons)`, (p) => pct(p.p_success))}</div>
+      <div class="page-head"><div><h1>${d.draft_year} ${PRO} Prospects</h1>
+        <p class="sub">Two models built on every D-I player-season since ${d.train ? d.train.first || (IS_W ? 2019 : 2008) : IS_W ? 2019 : 2008}. The <b>draft model</b> predicts where college players will be picked this ${MONTH}. The <b>success model</b> predicts whether a player becomes an established ${PRO} rotation player: ${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons. Both are trained only on completed seasons and checked out-of-sample against real drafts and real ${PRO} careers. ${IS_W ? "College players only: international prospects aren't modeled. The WNBA has only 36 picks and 144 roster spots, so even very good college players often don't stick; the women's history is also shorter (box scores since 2019), so these models are less certain than the men's." : "College players only: international and G League prospects aren't modeled, so board slots run ahead of real picks. Early in the season, ratings lean on last season and recruiting."}</p></div></div>
+      <div class="grid g2">${board("draft_score", "Projected draft board", `College players most likely to go early this ${MONTH} (P = ${tierLab[1].toLowerCase()})`, (p) => pct(p[tierKey[1]]))}
+        ${board("p_success", `Best ${PRO} bets`, `P(${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons)`, (p) => pct(p.p_success))}</div>
       <div class="section controls">
         <input type="search" id="xq" placeholder="Search prospects or teams…" style="width:230px" value="${esc(XF.q)}" aria-label="Search prospects">
         <select id="xcls" aria-label="Class"><option value="">All classes</option>${["Fr", "So", "Jr", "Sr"].map((c) => `<option ${c === XF.cls ? "selected" : ""}>${c}</option>`).join("")}</select>
         <select id="xconf" aria-label="Conference"><option value="">All conferences</option>${confs.map((c) => `<option ${c === XF.conf ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
-        ${seg("xview", [["draft", "Draft"], ["success", "NBA success"], ["stats", "Stats"]], XF.view)}
+        ${seg("xview", [["draft", "Draft"], ["success", `${PRO} success`], ["stats", "Stats"]], XF.view)}
       </div>
       <div class="card flush tbl-wrap"><table id="xtbl" class="ratings-table"></table></div>
       <div id="xmore" style="margin-top:10px"></div>
@@ -426,8 +445,8 @@
     });
     const n = rows.length, shown = rows.slice(0, XF.limit);
     const th = (key, label, title = "", cls = "") => `<th data-k="${key}" class="${cls} ${k === key ? "sorted" : ""}" title="${esc(title)}" scope="col">${label}${k === key ? (dr > 0 ? " ↑" : " ↓") : ""}</th>`;
-    const head = `<thead><tr>${th("board", "Board", "Projected order among college players (draft model)", "rankcol")}${th("name", "Player", "", "l")}${th("team", "Team", "", "l")}${th("age", "Age", "Age on draft day")}${cols.map(([c, l, , t]) => c === "comps" ? `<th class="l nosort" title="${esc(t)}">${l}</th>` : th(c, l, t || "")).join("")}</tr></thead>`;
-    const ncol = cols.length + 4;
+    const head = `<thead><tr>${th("board", "Board", "Projected order among college players (draft model)", "rankcol")}${th("name", "Player", "", "l")}${th("team", "Team", "", "l")}${IS_W ? "" : th("age", "Age", "Age on draft day")}${cols.map(([c, l, , t]) => c === "comps" ? `<th class="l nosort" title="${esc(t)}">${l}</th>` : th(c, l, t || "")).join("")}</tr></thead>`;
+    const ncol = cols.length + (IS_W ? 3 : 4);
     const body = shown.map((p) => {
       const cells = cols.map(([c, , f, , inv]) => {
         const v = p[c];
@@ -436,8 +455,8 @@
         if (f === "pct") return `<td><span class="heat num" style="background:color-mix(in srgb, var(--accent) ${Math.round(Math.min(1, v || 0) * 40)}%, transparent)">${v < 0.005 ? "<1%" : pct(v)}</span></td>`;
         return `<td><span class="heat num" style="${heat(pctRank(dist[c], v), inv === true)}">${fmt(v, f)}</span></td>`;
       }).join("");
-      return `<tr class="xrow" data-pid="${p.pid}" style="cursor:pointer" title="Click for NBA comps"><td class="rankcol">${p.board}</td><td class="l"><b>${esc(p.name)}</b> <span class="faint small">${XOPEN.has(p.pid) ? "▾" : "▸"}</span><div class="small faint">${esc([p.cls, p.ht, p.role].filter(Boolean).join(" · "))}</div></td>
-        <td class="l">${TEAMS[p.team] ? teamLink(p.team) : esc(p.team)}</td><td class="num">${fmt(p.age, 1)}</td>${cells}</tr>`
+      return `<tr class="xrow" data-pid="${p.pid}" style="cursor:pointer" title="Click for ${PRO} comps"><td class="rankcol">${p.board}</td><td class="l"><b>${esc(p.name)}</b> <span class="faint small">${XOPEN.has(p.pid) ? "▾" : "▸"}</span><div class="small faint">${esc([p.cls, typeof p.ht === "number" ? htFmt(p.ht) : p.ht, p.role].filter(Boolean).join(" · "))}</div></td>
+        <td class="l">${TEAMS[p.team] ? teamLink(p.team) : esc(p.team)}</td>${IS_W ? "" : `<td class="num">${fmt(p.age, 1)}</td>`}${cells}</tr>`
         + (XOPEN.has(p.pid) ? `<tr class="xdetail"><td colspan="${ncol}" class="l" style="white-space:normal;background:var(--surface-2)">${prospectDetail(p)}</td></tr>` : "");
     }).join("");
     const tbl = $("#xtbl");
@@ -464,51 +483,55 @@
   function prospectMethod(d, bt) {
     if (!bt) return "";
     const D = bt.draft, S = bt.success;
+    const T = d.thresholds || [5, 14, 30, 60], w = S.window;
+    const slotT = IS_W ? `Top ${T[0]} (AUC)` : "Lottery picks (AUC)", t1 = IS_W ? "First-round" : "Actual";
+    const yrs = `${w}-yr`;
     const row = (lab, a, b, c, best) => `<tr><td class="l">${lab}</td><td class="num ${best === 0 ? "best" : ""}">${a}</td><td class="num ${best === 1 ? "best" : ""}">${b}</td>${c !== undefined ? `<td class="num ${best === 2 ? "best" : ""}">${c}</td>` : ""}</tr>`;
     const slots = Object.entries(d.by_slot).map(([k, v]) => `<tr><td class="l">Picks ${k}</td><td class="num">${v.n}</td><td class="num">${pct(v.success)}</td><td class="num">${pct(v.star)}</td><td class="num">${fmt(v.median_ws)}</td></tr>`).join("");
     return `<div class="section prose" style="max-width:none">
       <h2>How the prospect models work</h2>
       <div class="grid g2">
         <div class="card"><h2>Draft model</h2>
-          <p class="small muted">Gradient-boosted classifiers give, for every player-season, the probability of being picked in the top 5, 14, 30 or 60 that June. Labels come from barttorvik.com's draft-pick field and count only on a player's final college season. The board orders players by the sum of the four probabilities. Backtest: each draft ${D.years[0]}–${D.years[1]} predicted by a model trained only on earlier drafts.</p>
+          <p class="small muted">Gradient-boosted classifiers give, for every player-season, the probability of being picked in the top ${T.slice(0, 3).join(", ")} or ${T[3]} that ${MONTH}. Labels come from ${IS_W ? "basketball-reference.com's WNBA draft pages, matched to college players by name, timing and school," : "barttorvik.com's draft-pick field"} and count only on a player's final college season. The board orders players by the sum of the four probabilities. Backtest: each draft ${D.years[0]}–${D.years[1]} predicted by a model trained only on earlier drafts.</p>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Test</th><th class="nosort">Model</th><th class="nosort">Baseline</th></tr></thead><tbody>
             ${row("Who gets drafted (AUC)", fmt(D.model.auc_drafted, 3), fmt(D.baseline.auc_drafted, 3), undefined, D.model.auc_drafted >= D.baseline.auc_drafted ? 0 : 1)}
-            ${row("Lottery picks (AUC)", fmt(D.model.auc_lottery, 3), fmt(D.baseline.auc_lottery, 3), undefined, D.model.auc_lottery >= D.baseline.auc_lottery ? 0 : 1)}
+            ${row(slotT, fmt(D.model.auc_lottery, 3), fmt(D.baseline.auc_lottery, 3), undefined, D.model.auc_lottery >= D.baseline.auc_lottery ? 0 : 1)}
             ${row("Draft order of picked players (Spearman)", fmt(D.model.spearman_pick, 2), fmt(D.baseline.spearman_pick, 2), undefined, D.model.spearman_pick >= D.baseline.spearman_pick ? 0 : 1)}
-            ${row("Actual draftees in the top 30 (avg)", fmt(D.model.top30_hits, 1), fmt(D.baseline.top30_hits, 1), undefined, D.model.top30_hits >= D.baseline.top30_hits ? 0 : 1)}
-          </tbody></table></div><p class="note">Baseline: a logistic model on recruiting score, BPM and age.</p></div>
-        <div class="card"><h2>NBA success model</h2>
-          <p class="small muted">Regularized logistic and Poisson models on ~70 college features. Success means ${S.success_ws}+ Win Shares in the first ${S.window} NBA seasons after college; a "star start" is ${S.star_ws}+. NBA careers come from basketball-reference.com, matched by name, timing and age; a player who never reaches the NBA counts as zero. Backtest: classes ${S.years[0]}–${S.years[1]}, each predicted at its final college season by a model trained on earlier classes.</p>
+            ${row(IS_W ? `Actual draftees in the top ${T[1]} (avg)` : "Actual draftees in the top 30 (avg)", fmt(D.model.top30_hits, 1), fmt(D.baseline.top30_hits, 1), undefined, D.model.top30_hits >= D.baseline.top30_hits ? 0 : 1)}
+          </tbody></table></div><p class="note">Baseline: a logistic model on ${IS_W ? "class, BPM and height (there are no free recruiting or birth-date data for women's college players)" : "recruiting score, BPM and age"}.</p></div>
+        <div class="card"><h2>${PRO} success model</h2>
+          <p class="small muted">Regularized logistic and Poisson models on ~70 college features. Success means ${S.success_ws}+ Win Shares in the first ${S.window} ${PRO} seasons ${IS_W ? "(the rookie season starts a month after the draft)" : "after college"}; a "star start" is ${S.star_ws}+. ${PRO} careers come from basketball-reference.com, matched by ${IS_W ? "draft records, then name and timing" : "name, timing and age"}; a player who never reaches the ${PRO} counts as zero. Backtest: classes ${S.years[0]}–${S.years[1]}, each predicted at its final college season by a model trained on earlier classes.</p>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Test</th><th class="nosort">Model</th><th class="nosort">Baseline</th><th class="nosort">Draft slot</th></tr></thead><tbody>
             ${row("All players: log loss ↓", fmt(S.model.ll_all, 4), fmt(S.baseline.ll_all, 4), "–", S.model.ll_all <= S.baseline.ll_all ? 0 : 1)}
             ${row("Drafted players: success (AUC)", fmt(S.model.auc_drafted, 3), fmt(S.baseline.auc_drafted, 3), fmt(S.draft_slot.auc_drafted, 3), [S.model.auc_drafted, S.baseline.auc_drafted, S.draft_slot.auc_drafted].indexOf(Math.max(S.model.auc_drafted, S.baseline.auc_drafted, S.draft_slot.auc_drafted)))}
-            ${row("Drafted players: 4-yr Win Shares (Spearman)", fmt(S.model.spearman_ws_drafted, 2), "–", fmt(S.draft_slot.spearman_ws_drafted, 2), S.model.spearman_ws_drafted >= S.draft_slot.spearman_ws_drafted ? 0 : 2)}
+            ${row(`Drafted players: ${yrs} Win Shares (Spearman)`, fmt(S.model.spearman_ws_drafted, 2), "–", fmt(S.draft_slot.spearman_ws_drafted, 2), S.model.spearman_ws_drafted >= S.draft_slot.spearman_ws_drafted ? 0 : 2)}
           </tbody></table></div>
-          <p class="note">Honest result: actual draft position is still the better predictor of NBA success (AUC ${fmt(S.draft_slot.auc_drafted, 3)} vs ${fmt(S.model.auc_drafted, 3)}). Teams see workouts, medicals and context that box scores don't, and adding the model to the slot didn't improve on the slot alone (${fmt(S.combined.auc_drafted, 3)}). Before the draft, though, the model is a strong statistical read, and it often flags players teams later passed on.</p></div>
+          <p class="note">${S.draft_slot.auc_drafted > S.model.auc_drafted ? `Honest result: actual draft position is still the better predictor of ${PRO} success (AUC ${fmt(S.draft_slot.auc_drafted, 3)} vs ${fmt(S.model.auc_drafted, 3)}). Teams see workouts, medicals and context that box scores don't` : `The model ranks drafted players' ${PRO} success about as well as or better than draft position (AUC ${fmt(S.model.auc_drafted, 3)} vs ${fmt(S.draft_slot.auc_drafted, 3)}), though with few classes the gap is noisy`}; model + slot together scored ${fmt(S.combined.auc_drafted, 3)}. Before the draft the model is a strong statistical read, and it often flags players teams later passed on.</p></div>
       </div>
       <div class="section grid g2">
         <div class="card"><h2>Out of sample: the ${D.last_draft.year} draft</h2><p class="note" style="margin-top:-4px">The model's pre-draft college board (trained only on earlier drafts) vs where players actually went.</p>
-          <div class="tbl-wrap"><table><thead><tr><th class="nosort">Board</th><th class="l nosort">Player</th><th class="l nosort">Team</th><th class="nosort">P(1st rd)</th><th class="nosort">Actual pick</th></tr></thead><tbody>
-          ${D.last_draft.board.map((r) => `<tr><td class="num">${r.rank}</td><td class="l">${esc(r.name)}</td><td class="l faint">${esc(r.team)}</td><td class="num">${pct(r.p30)}</td><td class="num ${r.pick == null ? "faint" : r.pick <= 30 ? "pos" : ""}">${r.pick == null ? "undrafted / returned" : "#" + r.pick}</td></tr>`).join("")}</tbody></table></div></div>
+          <div class="tbl-wrap"><table><thead><tr><th class="nosort">Board</th><th class="l nosort">Player</th><th class="l nosort">Team</th><th class="nosort">P(${IS_W ? "top " + T[1] : "1st rd"})</th><th class="nosort">Actual pick</th></tr></thead><tbody>
+          ${D.last_draft.board.map((r) => `<tr><td class="num">${r.rank}</td><td class="l">${esc(r.name)}</td><td class="l faint">${esc(r.team)}</td><td class="num">${pct(r.p30 ?? r["p" + T[1]])}</td><td class="num ${r.pick == null ? "faint" : r.pick <= T[1] * (IS_W ? 1 : 30 / 14) ? "pos" : ""}">${r.pick == null ? "undrafted / returned" : "#" + r.pick}</td></tr>`).join("")}</tbody></table></div></div>
         <div class="card"><h2>Out of sample: the ${S.last_class.year} class, ${S.window} years on</h2><p class="note" style="margin-top:-4px">The success model's top 20 at draft time (trained on earlier classes) and what happened.</p>
-          <div class="tbl-wrap"><table><thead><tr><th class="nosort">#</th><th class="l nosort">Player</th><th class="nosort">P(success)</th><th class="nosort">Pick</th><th class="nosort">4-yr WS</th></tr></thead><tbody>
+          <div class="tbl-wrap"><table><thead><tr><th class="nosort">#</th><th class="l nosort">Player</th><th class="nosort">P(success)</th><th class="nosort">Pick</th><th class="nosort">${yrs} WS</th></tr></thead><tbody>
           ${S.last_class.board.map((r) => `<tr><td class="num">${r.rank}</td><td class="l">${esc(r.name)} <span class="faint small">${esc(r.team)}</span></td><td class="num">${pct(r.p_success)}</td><td class="num">${r.pick == null ? "undrafted" : "#" + r.pick}</td><td class="num ${r.success ? "pos" : "faint"}">${fmt(r.ws, 1)}</td></tr>`).join("")}</tbody></table></div></div>
       </div>
-      ${bt.comps ? `<div class="section card"><h2>How the NBA comps work</h2>
-        <p class="small muted">A translation model (multi-output ridge regression) learns how a college profile turns into an NBA profile over a player's first ${S.window} NBA seasons. It's trained on ${bt.comps.n_players.toLocaleString()} college players who reached the NBA, ${bt.comps.classes[0]}–${bt.comps.classes[1]}. College comps are the past college players at the same stage (same class, age within 1.5 years) whose <i>projected</i> NBA profile, plus height, is closest. "Plays like" comps are NBA players whose <i>actual</i> profile is closest to the projection. Validation: each held-out class's five comps (chosen from earlier classes) predict the player's real NBA profile. Learned comps beat comps picked on raw college stats on average (R² ${fmt(Object.values(bt.comps.learned).reduce((a, b) => a + b, 0) / Object.keys(bt.comps.learned).length, 2)} vs ${fmt(Object.values(bt.comps.raw).reduce((a, b) => a + b, 0) / Object.keys(bt.comps.raw).length, 2)}).</p>
-        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">NBA dimension</th>${Object.keys(bt.comps.translation_r2).map((k) => `<th class="nosort">${esc(bt.comps.labels[k] || k)}</th>`).join("")}</tr></thead><tbody>
+      ${bt.comps ? `<div class="section card"><h2>How the ${PRO} comps work</h2>
+        <p class="small muted">A translation model (multi-output ridge regression) learns how a college profile turns into a ${PRO} profile over a player's first ${S.window} ${PRO} seasons. It's trained on ${bt.comps.n_players.toLocaleString()} college players who reached the ${PRO}, ${bt.comps.classes[0]}–${bt.comps.classes[1]}. College comps are the past college players at the same stage (same class${IS_W ? "" : ", age within 1.5 years"}) whose <i>projected</i> ${PRO} profile, plus height, is closest. "Plays like" comps are ${PRO} players whose <i>actual</i> profile is closest to the projection. Validation: each held-out class's five comps (chosen from earlier classes) predict the player's real NBA profile. ${(() => { const m = (o) => Object.values(o).reduce((a, b) => a + b, 0) / Object.keys(o).length, l = m(bt.comps.learned), r = m(bt.comps.raw);
+          return `Learned comps ${l > r + 0.01 ? "beat" : l < r - 0.01 ? "trail" : "are about as good as"} comps picked on raw college stats on average (R² ${fmt(l, 2)} vs ${fmt(r, 2)})${l <= r + 0.01 ? ", but they add the projected pro profile that raw stats can't" : ""}.`; })()}</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="l nosort">${PRO} dimension</th>${Object.keys(bt.comps.translation_r2).map((k) => `<th class="nosort">${esc(bt.comps.labels[k] || k)}</th>`).join("")}</tr></thead><tbody>
           <tr><td class="l">Translation model R²</td>${Object.values(bt.comps.translation_r2).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr>
           <tr><td class="l">Learned comps R²</td>${Object.values(bt.comps.learned).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr>
           <tr><td class="l">Raw-stat comps R²</td>${Object.values(bt.comps.raw).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr></tbody></table></div>
-        <p class="note">Out-of-sample. Rebounding, blocks, assists and 3-point volume carry over from college. Efficiency and overall impact (true shooting, BPM) are much harder to see coming.</p></div>` : ""}
+        <p class="note">Out-of-sample. Rebounding, blocks, assists and 3-point volume carry over from college. Efficiency and overall impact (true shooting, ${IS_W ? "WS/40" : "BPM"}) are much harder to see coming.</p></div>` : ""}
       <div class="section grid g3">
         <div class="card"><h2>Calibration</h2><p class="note" style="margin-top:-4px">Out-of-sample P(success) vs what happened (before the small Platt correction the live model applies).</p>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Bin</th><th class="nosort">Players</th><th class="nosort">Pred.</th><th class="nosort">Obs.</th></tr></thead><tbody>
           ${S.calibration.map((c) => `<tr><td class="l">${Math.round(100 * c.lo)}–${Math.round(100 * c.hi)}%</td><td class="num">${c.n.toLocaleString()}</td><td class="num">${pct(c.pred, 1)}</td><td class="num">${pct(c.obs, 1)}</td></tr>`).join("")}</tbody></table></div></div>
-        <div class="card"><h2>What drives NBA success</h2><p class="note" style="margin-top:-4px">Standardized weights in the success model (log-odds per SD).</p>
+        <div class="card"><h2>What drives ${PRO} success</h2><p class="note" style="margin-top:-4px">Standardized weights in the success model (log-odds per SD).</p>
           <ul class="clean plus">${d.drivers.up.map((x) => `<li>${esc(x.f)} <span class="faint num">${sgn(x.w, 2)}</span></li>`).join("")}</ul>
           <ul class="clean minus" style="margin-top:8px">${d.drivers.down.map((x) => `<li>${esc(x.f)} <span class="faint num">${sgn(x.w, 2)}</span></li>`).join("")}</ul>
-          <p class="note">Youth matters most: the same production at 19 is worth far more than at 23.</p></div>
+          <p class="note">${IS_W ? "Class stands in for age: the same production as a freshman or sophomore is worth far more than as a senior." : "Youth matters most: the same production at 19 is worth far more than at 23."}</p></div>
         <div class="card"><h2>History by draft slot</h2><p class="note" style="margin-top:-4px">College players drafted ${d.train.success_classes[0]}–${d.train.success_classes[1]}.</p>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Slot</th><th class="nosort">n</th><th class="nosort">Success</th><th class="nosort">Star</th><th class="nosort">Med. WS</th></tr></thead><tbody>${slots}</tbody></table></div></div>
       </div></div>`;
@@ -650,7 +673,7 @@
       </div>
       ${styleHtml}
       <div class="section grid g2 top">
-        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability <a class="small" style="font-weight:500" href="#/players?team=${encodeURIComponent(name)}">all stats →</a></h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average D-I player (box score + prior). Avail = chance he plays next game (injury reports, recent missed games).</p></div>
+        <div class="card flush"><div style="padding:16px 20px 6px"><h2>Roster &amp; availability <a class="small" style="font-weight:500" href="#/players?team=${encodeURIComponent(name)}">all stats →</a></h2><p class="note" style="margin-top:-4px">Value = points per 100 possessions above an average D-I player (box score + prior). Avail = chance ${he} plays next game (${IS_W ? "recent missed games, overrides" : "injury reports, recent missed games"}).</p></div>
           <div class="tbl-wrap"><table><thead><tr><th class="l nosort">Player</th><th class="nosort">Yr</th><th class="nosort hide-sm">Ht</th><th class="nosort">MPG</th><th class="nosort">Value</th><th class="nosort hide-sm">Off</th><th class="nosort hide-sm">Def</th><th class="nosort">Avail</th></tr></thead><tbody>${roster}</tbody></table></div></div>
         <div class="card flush"><div style="padding:16px 20px 6px"><h2>Schedule</h2></div>
           <div class="tbl-wrap"><table><tbody>${sched}</tbody></table></div></div>
@@ -1057,6 +1080,7 @@
 
   // ================================================================ METHOD
   async function viewMethod() {
+    if (IS_W) return viewMethodW();
     const bt = await get("backtest.json", true);
     let btHtml = `<p class="muted">Backtest not run yet.</p>`;
     if (bt) {
@@ -1084,7 +1108,60 @@
           ${ps.map((s) => { const m = Math.min(...psKeys.map((k) => s[k]).filter(isNum)); return `<tr><td class="l">${s.season}</td><td class="num">${s.n}</td>${psKeys.map((k) => `<td class="num ${s[k] === m ? "best" : ""}">${fmt(s[k], 3)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>` : ""}
         ${bt.leak ? `<h3 style="margin-top:18px">Leakage check</h3><p>${bt.leak.text || ""}</p><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Feature (one-term model)</th>${bt.leak.seasons.map((s) => `<th class="nosort">${s}</th>`).join("")}</tr></thead><tbody>${bt.leak.rows.map((r) => `<tr><td class="l">${esc(r.label)}</td>${r.values.map((v) => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="note">Log loss on games with an ESPN line, by season; lower is better.</p>` : ""}`;
     }
+    app.innerHTML = methodHtml(bt, btHtml);
+  }
+
+  function backtestHtml(bt, lineText) {
+    if (!bt) return `<p class="muted">Backtest not run yet.</p>`;
+    const keys = bt.models.map((m) => m.key);
+    const label = Object.fromEntries(bt.models.map((m) => [m.key, m.label]));
+    const table = (sub, title, withMarket) => {
+      const r = bt.subsets[sub]; if (!r) return "";
+      const ks = keys.filter((k) => r[k]).concat(withMarket && r.market ? ["market"] : []);
+      const best = Math.min(...ks.filter((k) => k !== "market").map((k) => r[k].log_loss));
+      return `<h3 style="margin-top:18px">${title}</h3><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Model</th><th class="nosort">Games</th><th class="nosort">Log loss ↓</th><th class="nosort">Brier ↓</th><th class="nosort">Accuracy ↑</th><th class="nosort">RMSE ↓</th></tr></thead><tbody>
+        ${ks.map((k) => `<tr><td class="l">${k === "market" ? "<i>Betting line (benchmark only)</i>" : esc(label[k])}${k === bt.final ? ` <span class="pill acc">live model</span>` : ""}</td><td class="num">${r[k].n.toLocaleString()}</td><td class="num ${r[k].log_loss === best ? "best" : ""}">${fmt(r[k].log_loss, 4)}</td><td class="num">${fmt(r[k].brier, 4)}</td><td class="num">${pct(r[k].accuracy, 1)}</td><td class="num">${fmt(r[k].rmse, 2)}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    };
+    const lineSubs = Object.keys(bt.subsets).filter((k) => k.endsWith("line_games"));
+    return `<p>Season-ahead backtest, ${bt.seasons[0]}–${bt.seasons[1]}: for every test season, each model is trained only on earlier seasons, then predicts every game from ratings as of the day before. The same games are scored for every model.</p>
+      ${table("all", "All D-I games", false)}${table("ncaa", "NCAA tournament games", false)}
+      ${lineSubs.length ? `<h3 style="margin-top:22px">Against the betting market</h3><p>${lineText}</p>${lineSubs.map((k) => table(k, k.startsWith("book") ? "Games with a sportsbook line" : "Games with an ESPN consensus line", true)).join("")}` : ""}`;
+  }
+
+  async function viewMethodW() {
+    const bt = await get("backtest.json", true);
+    const btHtml = backtestHtml(bt, "Lines are a benchmark only, never a model input. ESPN carries sportsbook lines for women's games only from 2025-26, and mostly for bigger games, so this is a small, selected sample. The model edges the line there. Women's betting markets are thinner than men's, so that's plausible, but it's exactly the symptom that exposed the men's leak, so it was checked the same way: a one-term model on the roster rating alone scores 0.404 log loss on those games, worse than the line (0.396). On the men's side, the leaky roster rating beat the line. The Kalman rating alone is level with the line.");
     app.innerHTML = `<div class="prose">
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">The women's site runs the same pipeline as the men's (point-in-time ratings, player values, a blended game model, exact bracket odds, team identities and WNBA prospects), rebuilt on data that is free for the women's game.</p></div></div>
+      <h2>Backtest</h2>${btHtml}
+      <h2>1 · Data (free and public)</h2>
+      <ul>
+        <li><b>ESPN</b> public API: every D-I game since 2019 (schedules, venues and neutral sites, NCAA seeds and rounds, conferences, logos), full box scores, and <b>play-by-play</b> (four 10-minute quarters) with full shot detail since 2020. Player heights and classes come from ESPN athlete records. Pre-game lines, where ESPN has them, are used only as a benchmark.</li>
+        <li><b>basketball-reference.com</b>: WNBA seasons since 2018 and WNBA drafts since 2019 (requests spaced 6 seconds apart).</li>
+        <li>There's no free women's equivalent of barttorvik.com, so every player rate (usage, TS%, assist/rebound/block/steal rates, box plus/minus) is computed here from ESPN box scores. There's no free injury feed either: availability comes from recent missed games plus a hand-edited <code>overrides/womens/injuries.yaml</code>.</li>
+      </ul>
+      <h2>2 · Ratings</h2>
+      <p>The same two engines as the men's site. A <b>dynamic Kalman rating</b> tracks each team's offense, defense and tempo after every game, carrying over between seasons by returning minutes. <b>Adjusted efficiency</b> is a recency-weighted ridge regression re-solved before every game day. Elo is kept as a baseline. Possessions use the same 0.475·FTA estimate, and tempo is per 40 minutes.</p>
+      <h2>3 · Players</h2>
+      <p>Player value is a box plus/minus fitted for the women's game: each game's opponent-adjusted team offensive and defensive efficiency (vs the opponent's <i>pre-game</i> Kalman rating, so nothing from the future leaks in) is regressed on the team's minute-weighted per-40 box-score rates. A player's value is her share of that fit, plus the team residual, in the same points-per-100 units as the men's site. Values are shrunk toward a prior (last season, class) until minutes pile up, and roster strength is Σ minutes share × value.</p>
+      <h2>4 · Team identity</h2>
+      <p>Play-by-play style rates (transition, shot zones, assisted shares, turnover types, putbacks and more) are opponent- and venue-adjusted, strength is regressed out, and factor analysis plus a Gaussian mixture give named dimensions and soft archetypes. The women's style model is fitted on women's play-by-play (2020–21 onward, about 2,000 team-seasons). Where its dimensions match the men's (most do, closely), the men's names carry over; the archetypes were named by hand from their own profiles.</p>
+      <h2>5 · The game model</h2>
+      <p>The same blend: an antisymmetric <b>matchup network</b> (team embeddings plus a pair head and a σ head, 5-seed ensemble) and a regularized <b>linear game model</b> on the Kalman margin, the AdjEM margin, home court, travel, rest and availability. The weight is chosen by the backtest. P(win) = Φ(margin/σ).</p>
+      <h2>6 · Power ratings</h2>
+      <p>Power is the blended model's neutral-floor round-robin: average predicted margin per 100 possessions against the top-100 teams, re-centered so 0 = an average D-I team. Strength of schedule is the average Power of the opponents faced.</p>
+      <h2>7 · Bracket</h2>
+      <p>The 2027 women's tournament also has <b>76 teams</b>, with a 12-game opening round. First and second rounds are played on the campuses of the top-16 seeds, regionals are in Philadelphia and Las Vegas (two regions each), and the Final Four is in Columbus, Ohio. Before Selection Sunday the field is projected (conference champions plus best at-larges, S-curve seeding). Afterwards it's read from ESPN or <code>overrides/womens/bracket_2027.yaml</code>. Advancement odds are exact, with venue-specific travel.</p>
+      <h2>8 · WNBA prospects</h2>
+      <p>A draft model (P picked in the top 4, 12 or 24, or at all, in the three-round April draft) and a WNBA success model (P of 2.5+ Win Shares in the first three WNBA seasons, starting the summer of the draft), with college comps and "plays like" WNBA comps from a translation model. Trained on every D-I player-season since 2019 and checked against real drafts and careers. Details are on the <a href="#/prospects">Prospects</a> page.</p>
+      <h2>Refresh</h2>
+      <p>The same GitHub Action runs <code>python -m hoop2vec daily --womens</code> every morning in season and retrains monthly. The site is static JSON.</p>
+    </div>`;
+  }
+
+  function methodHtml(bt, btHtml) {
+    return `<div class="prose">
       <div class="page-head"><div><h1>How it works</h1><p class="sub">Public data → point-in-time ratings, players and styles → a blended game model → ratings, forecasts and the bracket. hoop2vec merges two earlier projects (mmai and mmkm), keeping the better piece wherever they overlapped.</p></div></div>
       <h2>Backtest</h2>${btHtml}
       <h2>1 · Data (free and public)</h2>

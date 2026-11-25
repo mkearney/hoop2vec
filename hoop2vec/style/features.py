@@ -101,7 +101,8 @@ def team_game_table(tg: pd.DataFrame, games: pd.DataFrame, d1: set[str]) -> pd.D
     tg["poss"] = (tg["fga"] - tg["oreb"] + tg["tov"] + 0.44 * tg["fta"]).clip(lower=40)
     o_poss = (o["fga"] - o["oreb"] + o["tov"] + 0.44 * o["fta"]).clip(lower=40)
     tg["game_poss"] = 0.5 * (tg["poss"] + o_poss.loc[tg.index])
-    n_ot = games.set_index("game_id").reindex(tg["game_id"])["n_periods"].fillna(2).values - 2
+    from ..config import REG_PERIODS
+    n_ot = games.set_index("game_id").reindex(tg["game_id"])["n_periods"].fillna(REG_PERIODS).values - REG_PERIODS
     tg["minutes"] = 40 + 5 * np.clip(n_ot, 0, None)
     tg["tempo"] = tg["game_poss"] * 40 / tg["minutes"]
     tg["two_a"] = tg["fga"] - tg["tpa"]

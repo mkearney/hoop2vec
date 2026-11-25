@@ -295,7 +295,8 @@ def conferences(season: int, cw: pd.DataFrame) -> pd.DataFrame:
     prev = prev[prev["season"] == prev["season"].max()].set_index("team")["conf"]
     rows = []
     try:
-        d = get("https://site.web.api.espn.com/apis/v2/sports/basketball/mens-college-basketball/standings"
+        from .config import ESPN_SPORT
+        d = get(f"https://site.web.api.espn.com/apis/v2/sports/basketball/{ESPN_SPORT}/standings"
                 "?region=us&lang=en&contentorigin=espn&group=50", timeout=60).json()
         confs = []
         for c in d.get("children", []):

@@ -124,7 +124,9 @@ def availability(meta: pd.DataFrame, players: pd.DataFrame):
     lastc = roster.groupby(["team", "last"])["pid"].agg(list)
     by_last = {k: v[0] for k, v in lastc.items() if len(v) == 1}
     out, rep = {}, []
-    for src, df in (("covers", covers()), ("rotowire", rotowire()), ("manual", manual())):
+    from ..config import WOMENS
+    feeds = (("manual", manual()),) if WOMENS else (("covers", covers()), ("rotowire", rotowire()), ("manual", manual()))
+    for src, df in feeds:
         for r in df.itertuples():
             team = match_team(r.team) or (r.team if r.team in set(roster["team"]) else None)
             if team is None:

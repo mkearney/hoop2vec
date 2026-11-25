@@ -1,0 +1,17 @@
+# 2027 NCAA women's tournament: 76 teams (expansion announced May 7, 2026), 12-game Opening Round.
+# First and second rounds (and, here, Opening Round games) are hosted on the campuses of the top-16 seeds.
+# Sweet 16 / Elite Eight: two sites, each hosting two regions (Philadelphia, Las Vegas). Final Four: Columbus, OH.
+# Region names follow ESPN's "Regional N in <city>" convention. Edit if anything changes.
+field_size: 76
+opening_auto: 12
+opening_at_large: 12
+regions:
+  - {name: Philadelphia 1, site: "Philadelphia, PA"}
+  - {name: Las Vegas 2, site: "Las Vegas, NV"}
+  - {name: Philadelphia 3, site: "Philadelphia, PA"}
+  - {name: Las Vegas 4, site: "Las Vegas, NV"}
+final_four_pairs: [[Philadelphia 1, Las Vegas 4], [Las Vegas 2, Philadelphia 3]]
+first_round_sites: campus
+opening_sites: campus
+final_four_site: "Columbus, OH"
+# Once the bracket is announced it is read from ESPN automatically. To enter it by hand, see overrides/mens.

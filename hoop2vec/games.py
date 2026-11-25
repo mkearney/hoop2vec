@@ -72,12 +72,40 @@ def espn_games(seasons, refresh_current=True) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------- NCAA parsing
-NCAA_RE = re.compile(r"^(NCAA )?MEN'S BASKETBALL CHAMP", re.I)
+NCAA_RE = re.compile(r"^(NCAA )?MEN'S BASKETBALL CHAMP", re.IGNORECASE)
 ROUND_NAMES = ["First Four", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"]
 
 
+WNCAA_RE = re.compile(r"\bNCAA WOMEN'S (BASKETBALL )?CHAMP", re.IGNORECASE)
+
+
+def _womens_round(n: str) -> int | None:
+    """'NCAA WOMEN'S CHAMPIONSHIP - REGIONAL 4 IN SPOKANE - 1ST ROUND' -> 1. The round is the last ' - ' segment;
+    2021 (San Antonio bubble) used 'SEMIFINAL' / 'FINAL' inside a region for the Sweet 16 / Elite 8."""
+    seg = re.split(r"\s*-\s*", n.strip())
+    tail, has_region = seg[-1].strip().upper(), len(seg) > 2
+    if "FIRST FOUR" in tail or "OPENING ROUND" in tail:
+        return 0
+    if re.search(r"1ST ROUND|FIRST ROUND", tail):
+        return 1
+    if re.search(r"2ND ROUND|SECOND ROUND", tail):
+        return 2
+    if re.search(r"SWEET 16|SWEET SIXTEEN|REGIONAL SEMI", tail) or (has_region and tail == "SEMIFINAL"):
+        return 3
+    if re.search(r"ELITE 8|ELITE EIGHT|REGIONAL FINAL", tail) or (has_region and tail == "FINAL"):
+        return 4
+    if re.search(r"FINAL FOUR|NATIONAL SEMI", tail):
+        return 5
+    if re.search(r"NATIONAL CHAMPIONSHIP|CHAMPIONSHIP GAME|^FINAL$", tail):
+        return 6
+    return None
+
+
 def ncaa_round(notes: str, season: int) -> int | None:
+    from .config import WOMENS
     n = (notes if isinstance(notes, str) else "").upper()
+    if WOMENS:
+        return _womens_round(n) if WNCAA_RE.search(n) else None
     if not NCAA_RE.search(n):
         return None
     if "OPENING ROUND" in n or "FIRST FOUR" in n:
@@ -101,6 +129,14 @@ def ncaa_round(notes: str, season: int) -> int | None:
 
 
 def ncaa_region(notes: str) -> str | None:
+    from .config import WOMENS
+    if WOMENS:
+        n = notes if isinstance(notes, str) else ""
+        m = re.search(r"Regional (\d)(?: in ([A-Za-z .']+?))?\s*(?:-|$)", n, re.IGNORECASE)
+        if m:
+            return f"{m.group(2).strip().title()} {m.group(1)}" if m.group(2) else f"Regional {m.group(1)}"
+        m = re.search(r"-\s*([A-Za-z .']+?) Region(?:al)?\s*(?:-|$)", n, re.IGNORECASE)
+        return m.group(1).strip().title() if m else None
     m = re.search(r"- ([A-Z][A-Za-z.' ]+?) REGION", (notes if isinstance(notes, str) else "").upper())
     return m.group(1).title() if m else None
 

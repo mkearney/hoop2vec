@@ -3,43 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>hoop2vec — College Basketball Ratings, Identities &amp; Bracket</title>
-  <meta name="description" content="Daily men's college basketball power ratings, game predictions, team style identities and the 2027 NCAA bracket, from a leak-free blend of a matchup neural network and a dynamic-rating game model. Free public data only.">
+  <title>hoop2vec — College Basketball Ratings, Prospects &amp; Bracket</title>
+  <meta name="description" content="Daily men's and women's college basketball power ratings, player values, pro prospects, team identities and the 2027 NCAA brackets, from leak-free models on free public data.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23eb6834'/><path d='M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44' stroke='%23111' stroke-width='3' fill='none'/></svg>">
 </head>
-<body>
-  <header class="topbar">
-    <div class="wrap topbar-inner">
-      <a class="brand" href="#/ratings">
-        <svg class="brand-ball" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#eb6834"/><path d="M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44" stroke="#111" stroke-width="3.5" fill="none"/></svg>
-        <span>hoop2vec</span>
+<body class="chooser">
+  <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./"><svg class="brand-ball" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#eb6834"/><path d="M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44" stroke="#111" stroke-width="3.5" fill="none"/></svg><span>hoop2vec</span></a>
+    <div class="top-right" style="margin-left:auto"><button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle dark mode"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button></div></div></header>
+  <main class="wrap">
+    <section class="choose-hero">
+      <h1>College basketball, modeled honestly</h1>
+      <p class="sub">Daily power ratings, game forecasts, player values, pro prospects, team style identities and the 2027 NCAA tournament, for the men's and women's game. Every number is computed point-in-time and checked against what actually happened.</p>
+    </section>
+    <section class="choices">
+      <a class="choice card" href="mens/" data-league="mens">
+        <span class="kind">Men's college basketball</span>
+        <span class="big">Men's</span>
+        <span class="muted small">Power ratings, players, NBA prospects, Matchup Lab, games, the 2027 bracket and team identities.</span>
+        <span class="top5" id="top-mens"></span>
+        <span class="go">Open men's →</span>
       </a>
-      <nav class="nav" id="nav" aria-label="Sections">
-        <a href="#/ratings" data-route="ratings">Ratings</a>
-        <a href="#/players" data-route="players">Players</a>
-        <a href="#/prospects" data-route="prospects">Prospects</a>
-        <a href="#/bracket" data-route="bracket">Bracket</a>
-        <a href="#/matchup" data-route="matchup">Matchup Lab</a>
-        <a href="#/games" data-route="games">Games</a>
-        <a href="#/styles" data-route="styles">Styles</a>
-        <a href="#/method" data-route="method">Method</a>
-      </nav>
-      <div class="top-right">
-        <span class="updated" id="updated"></span>
-        <button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle dark mode"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
-      </div>
-    </div>
-  </header>
-  <main class="wrap" id="app"><div class="loading">Loading…</div></main>
-  <footer class="wrap footer">
-    <span id="foot-src">hoop2vec · refreshed daily · free public data: barttorvik.com, ESPN, Covers, Rotowire</span>
-    <a href="https://github.com/mkearney/hoop2vec">source</a>
-  </footer>
-  <div id="tooltip" class="tooltip" role="tooltip"></div>
-  <script src="assets/app.js"></script>
+      <a class="choice card" href="womens/" data-league="womens">
+        <span class="kind">Women's college basketball</span>
+        <span class="big">Women's</span>
+        <span class="muted small">Power ratings, players, WNBA prospects, Matchup Lab, games, the 2027 bracket and team identities.</span>
+        <span class="top5" id="top-womens"></span>
+        <span class="go">Open women's →</span>
+      </a>
+    </section>
+  </main>
+  <footer class="wrap footer"><span>hoop2vec · free public data only</span><a href="https://github.com/mkearney/hoop2vec">source</a></footer>
+  <script>
+  (() => {
+    const root = document.documentElement;
+    try { const t = localStorage.getItem("hoop2vec-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+    document.getElementById("theme").addEventListener("click", () => {
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      try { localStorage.setItem("hoop2vec-theme", root.dataset.theme); } catch (e) {}
+    });
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+    for (const lg of ["mens", "womens"]) {
+      fetch(lg + "/data/ratings.json", { cache: "no-cache" }).then((r) => r.ok ? r.json() : null).then((d) => {
+        if (!d) return;
+        document.getElementById("top-" + lg).innerHTML = "<b>Top 5 today</b>" + d.teams.slice(0, 5).map((t) =>
+          `<span class="row">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="" loading="lazy">` : ""}<span>${t.rank}. ${esc(t.team)}</span></span>`).join("");
+      }).catch(() => {});
+    }
+  })();
+  </script>
 </body>
 </html>

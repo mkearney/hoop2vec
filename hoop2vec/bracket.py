@@ -144,8 +144,25 @@ def projected_bracket(fld: pd.DataFrame, cfg: dict) -> dict:
             "projected": True}
 
 
+def _campus(team, state):
+    if team in state.index and not np.isnan(state.at[team, "lat"]):
+        city = state.at[team, "city"] if "city" in state.columns else team
+        st = state.at[team, "state"] if "state" in state.columns else ""
+        return {"city": f"{team} ({city}, {st})" if isinstance(city, str) and city else str(team),
+                "lat": float(state.at[team, "lat"]), "lon": float(state.at[team, "lon"])}
+    return None
+
+
 def assign_pods(br: dict, state: pd.DataFrame, cfg: dict):
-    """First/second-round sites: protected seeds (1-4) take the nearest site with capacity."""
+    """First/second-round sites: protected seeds (1-4) take the nearest site with capacity.
+    ``first_round_sites: campus`` (women's tournament): each pod is hosted at its top seed's home arena."""
+    if cfg.get("first_round_sites") == "campus":
+        out = {}
+        for reg in br["regions"]:
+            for pod, top in POD_TOP.items():
+                team = (reg["slots"].get(top) or reg["slots"].get(str(top)) or [None])[0]
+                out[(reg["name"], pod)] = _campus(team, state) or reg.get("site")
+        return out
     sites = [_site(s) for s in cfg.get("first_round_sites", DEFAULT_SITES["first_round_sites"])]
     cap = {i: 2 for i in range(len(sites))}
     pods = []
@@ -222,7 +239,8 @@ REST = {0: 4, 1: 4, 2: 2, 3: 5, 4: 2, 5: 6, 6: 2}
 
 def build_tree(br: dict, pod_sites: dict, cfg: dict) -> Node:
     ff_site = _site(cfg.get("final_four_site", DEFAULT_SITES["final_four_site"]))
-    open_sites = [_site(s) for s in cfg.get("opening_sites", DEFAULT_SITES["opening_sites"])]
+    campus_open = cfg.get("opening_sites") == "campus"  # opening-round games at the pod host's arena
+    open_sites = [] if campus_open else [_site(s) for s in cfg.get("opening_sites", DEFAULT_SITES["opening_sites"])]
     reg_nodes = {}
     for reg in br["regions"]:
         name = reg["name"]
@@ -234,7 +252,8 @@ def build_tree(br: dict, pod_sites: dict, cfg: dict) -> Node:
             elif len(teams) >= 2:
                 a = Node(0, None, team=teams[0], region=name, seed=seed)
                 b = Node(0, None, team=teams[1], region=name, seed=seed)
-                leaves.append(Node(0, {"multi": open_sites}, a, b, region=name, seed=seed, slot=f"{name}-{seed}-OR"))
+                osite = (pod_sites.get((name, POD_OF_SEED[seed])) or reg["site"]) if campus_open else {"multi": open_sites}
+                leaves.append(Node(0, osite, a, b, region=name, seed=seed, slot=f"{name}-{seed}-OR"))
             else:
                 leaves.append(Node(0, None, team=None, region=name, seed=seed, slot=f"{name}-{seed}"))
         level = leaves

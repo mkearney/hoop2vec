@@ -1,10 +1,12 @@
 # hoop2vec
 
-Daily men's college basketball **power ratings**, **game forecasts**, data-driven **team identities** and the
-**2027 NCAA bracket**, built only from free public data. Every number on the site is computed point-in-time
-and checked for look-ahead leakage against closing betting lines.
+Daily **men's and women's** college basketball **power ratings**, **game forecasts**, **player values**, **pro
+prospects** (NBA / WNBA), data-driven **team identities** and the **2027 NCAA brackets**, built only from free
+public data. Every number on the site is computed point-in-time and checked for look-ahead leakage against closing
+betting lines.
 
-**Site:** https://mkearney.github.io/hoop2vec/ (GitHub Pages, served from `docs/`)
+**Site:** https://mkearney.github.io/hoop2vec/ (GitHub Pages, served from `docs/`). The home page picks a league:
+`docs/mens/` and `docs/womens/` run the same app (`docs/assets/`) on their own data (`docs/<league>/data/`).
 
 hoop2vec merges two earlier projects. Where they overlapped, the better piece was kept, or both were combined:
 
@@ -45,14 +47,14 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
 * **Power**: points per 100 possessions better than an average D-I team on a neutral floor (0 = average), from the
   final game model's round-robin against top-100-calibre opposition. **SOS** is the average Power of the opponents
   faced, so 0 is an average D-I schedule.
-* **Players** (`docs/data/players.json`): every D-I player this season. **Value** is the de-leaked, prior-shrunk box
-  plus/minus (points per 100 possessions vs an average D-I player). **Impact** = minutes share × (value −
-  replacement), i.e. what he adds to his team's rating. Each player also gets availability, ESPN per-game box stats
+* **Players** (`docs/<league>/data/players.json`): every D-I player this season. **Value** is the de-leaked,
+  prior-shrunk box plus/minus (points per 100 possessions vs an average D-I player). **Impact** = minutes share ×
+  (value − replacement), i.e. what the player adds to the team's rating. Each player also gets availability, ESPN per-game box stats
   and Torvik's advanced rates. The site defaults to rotation players (3+ games, 15+ mpg) and can show everyone.
 
 ## NBA prospects
 
-Two models on every D-I player-season since 2008 (`hoop2vec/prospects.py`, `docs/data/prospects.json`):
+Two models on every D-I player-season since 2008 (`hoop2vec/prospects.py`, `docs/mens/data/prospects.json`):
 
 * **Draft model:** gradient-boosted classifiers give P(picked in the top 5 / 14 / 30 / 60 this June). The college
   board orders players by them. Labels come from barttorvik.com's draft-pick field, counted on a player's final
@@ -118,6 +120,56 @@ sportsbook is still better than the model during the regular season and level wi
 from an honest public-data model. ESPN's older "consensus" lines (2015–2023) are soft, especially in November:
 the blend beats them on 41,280 games (0.5258 vs 0.5331), so they are not used as evidence of skill.
 
+## Women's basketball
+
+Same app, same models, rebuilt on what is free for the women's game (`python -m hoop2vec <mode> --womens`;
+`hoop2vec/womens_data.py`). There is no women's barttorvik.com, so everything comes from ESPN plus
+Basketball-Reference:
+
+| | Men's | Women's |
+|---|---|---|
+| Games, box scores | Torvik since 2008 (+ ESPN) | ESPN since 2019 (four 10-minute quarters handled in the PBP parser) |
+| Play-by-play (identities) | ESPN since 2015 | ESPN since 2020 |
+| Conferences | Torvik | ESPN standings |
+| Player values | Torvik game BPM, de-leaked | Own box plus/minus (below) |
+| Injuries | Covers + Rotowire + overrides | Recent missed games + `overrides/womens/injuries.yaml` |
+| Pro data | NBA seasons + Torvik draft picks | WNBA seasons + WNBA drafts (Basketball-Reference) |
+| Bracket | 76 teams, neutral pods | 76 teams; first/second rounds on the top-16 seeds' campuses; regionals Philadelphia + Las Vegas; Final Four Columbus |
+
+* **Player values.** Each team-game's opponent-adjusted offensive and defensive efficiency (vs the opponent's
+  *pre-game* Kalman rating, so nothing leaks) is regressed on the team's minute-weighted per-40 box-score rates;
+  a player's value is her share of that fit plus the team residual, in the same units as Torvik's BPM. Team-level
+  regressions over-credit whoever grabs the rebound or makes the interior shot (raw correlation of value with
+  height 0.59, vs 0.27 for Torvik's men's BPM), so credit is shifted by height *within each team-game* (team totals
+  unchanged), calibrated so the offensive/defensive height correlations match Torvik's.
+* **Identities.** A women's style model fitted on women's play-by-play (`python -m hoop2vec style --womens`); the
+  men's hand-written names were carried over where the fitted dimensions match (loading cosine 0.80–0.99) and the
+  archetypes were renamed by hand from their centroids (`artifacts/womens/style/style_names.json`).
+* **WNBA prospects.** The WNBA draft has three rounds (36 picks) in April and the rookie season starts weeks later,
+  so the draft tiers are top 4 / 12 / 24 / drafted, and success is 2.5+ Win Shares in the first three WNBA seasons
+  (about the top 15% of picks; a "star start" is 5+). Drafts are linked to college players by name, timing and
+  school. No free birth dates or recruiting ranks exist for women's players, so class and height stand in.
+  Backtest (draft years 2021–2026, success classes 2021–2024): who gets drafted AUC 0.989 (baseline 0.985); draft
+  order of picked players Spearman 0.49 (0.35); success among drafted players AUC 0.84, below draft slot (0.87).
+  Women's comps translate to a WNBA profile with total rebound rate and WS/40 in place of DRB% and BPM.
+
+Women's season-ahead backtest, 2022–2026 (trained on 2020 onward; log loss):
+
+| Model | All games (26,762) | NCAA tournament (332) | Sportsbook lines, 2025-26 (811) |
+|---|---|---|---|
+| **hoop2vec blend** (80% network + 20% linear, live model) | **0.4614** | 0.3932 | 0.3896 |
+| Matchup network (all features) | 0.4616 | 0.3956 | **0.3894** |
+| Linear game model | 0.4653 | 0.3934 | 0.3933 |
+| Adjusted efficiency (AdjEM) | 0.4704 | 0.4050 | 0.3932 |
+| Dynamic (Kalman) rating | 0.4706 | **0.3924** | 0.3948 |
+| Elo | 0.4928 | 0.4476 | 0.4169 |
+| Sportsbook line (benchmark only) | – | – | 0.3956 |
+
+The blend beats the linear model on all games by 0.0039 (95% CI 0.0031–0.0047). It also edges the few women's
+sportsbook lines ESPN carries. Women's markets are thinner, so that is plausible, but it's the symptom that exposed
+the men's leak, so it was checked the same way: a one-term model on the roster rating alone scores 0.404 on those
+games, worse than the line (0.396), and the Kalman rating alone is level with it.
+
 ## Usage
 
 ```bash
@@ -131,7 +183,15 @@ python -m hoop2vec all        # train + backtest + publish
 python -m hoop2vec publish    # re-export the site from cached features (fast)
 python -m hoop2vec history    # after a season ends: refresh the committed history/ bundle
 python -m hoop2vec ingest 2015-2026   # play-by-play for past seasons (only needed to refit identities)
+python -m hoop2vec style      # refit the team-identity model from the play-by-play seasons
+python -m hoop2vec site       # rewrite the page shells (docs/index.html chooser + docs/<league>/index.html)
+
+python -m hoop2vec daily --womens     # any mode, for the women's site (default: --mens)
 ```
+
+Each league keeps its own `data/<league>/`, `artifacts/<league>/`, `history/<league>/`, `overrides/<league>/` and
+`docs/<league>/`. A fresh women's data cache ingests the completed ESPN seasons once (about 40 minutes), and then
+only the current season.
 
 **Polite data access.** Requests identify themselves (`hoop2vec-research/1.0`). Calls to barttorvik.com are spaced at
 least 10 seconds apart, as its robots.txt asks. A daily run never downloads Torvik's player-game json: this season's
@@ -142,14 +202,14 @@ To preview locally: `cd docs && python -m http.server`.
 
 ### Manual controls
 
-* `overrides/injuries.yaml`: force a player's availability (e.g. a star ruled out).
-* `overrides/bracket_2027.yaml`: tournament sites, Final Four pairings, or a hand-entered bracket.
-* `artifacts/style/style_names.json`: names and descriptions of style dimensions and archetypes.
+* `overrides/<league>/injuries.yaml`: force a player's availability (e.g. a star ruled out).
+* `overrides/<league>/bracket_2027.yaml`: tournament sites, Final Four pairings, or a hand-entered bracket.
+* `artifacts/<league>/style/style_names.json`: names and descriptions of style dimensions and archetypes.
 
 ### Automation
 
-* `.github/workflows/daily.yml`: every morning, November through April.
-* `.github/workflows/retrain.yml`: monthly retrain + backtest, or on demand.
+* `.github/workflows/daily.yml`: every morning, November through April, men's then women's.
+* `.github/workflows/retrain.yml`: monthly retrain + backtest for both leagues, or on demand.
 
 Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
 
@@ -157,7 +217,9 @@ Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/
 
 ```
 hoop2vec/            python package
-  sources/           torvik.py, espn.py, pbp.py (play-by-play parser), injuries.py
+  config.py          league switch (HOOP2VEC_LEAGUE / --womens): paths, ESPN sport, game length
+  sources/           torvik.py, espn.py, pbp.py (play-by-play parser), injuries.py, bbref.py (NBA + WNBA)
+  womens_data.py     women's games, conferences, player values and college player table from ESPN
   games.py           games table, Torvik<->ESPN crosswalk, venues, NCAA rounds/seeds
   espn_fallback.py   current season from ESPN when Torvik is unreachable
   ingest.py          ESPN play-by-play ingest (box score, PBP counts, lineups, closing line)
@@ -165,11 +227,14 @@ hoop2vec/            python package
   players.py         player values (de-leaked), roster strength, availability
   features.py        leak-free per-game modelling table
   model/             net.py + train.py (matchup network), linear.py (linear game model), backtest.py
-  style/             play-by-play features, EB adjustment, roster, factor model, identity cards
+  style/             play-by-play features, EB adjustment, roster, factor model, identity cards, fit.py
+  prospects.py       draft + pro success models;  comps.py: college and pro comparisons
+  site.py            page shells: league chooser + one page per league
   predict.py         live team state, blended predictor, Power ratings, upcoming games
   bracket.py         projected/actual bracket, exact probabilities, picks
   pipeline.py        end-to-end + site JSON
-history/             compact committed copy of completed seasons (games, players, venues, closing lines)
-artifacts/           trained models, blend weight, crosswalk, team metadata, style model, backtests
-docs/                static site (index.html, assets/, data/)
+history/<league>/    compact committed copy of completed seasons (games, players, venues, lines, pro careers)
+artifacts/<league>/  trained models, blend weight, crosswalk, team metadata, style model, backtests
+overrides/<league>/  hand-edited injuries and bracket
+docs/                static site: index.html (choose a league), assets/ (shared app), mens/ and womens/
 ```

@@ -15,9 +15,9 @@ import urllib.request
 from collections import defaultdict
 from datetime import date, timedelta
 
-from ..config import USER_AGENT
+from ..config import ESPN_BASE, PERIOD_SECONDS, REG_PERIODS, USER_AGENT
 
-BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball"
+BASE = ESPN_BASE
 UA = {"User-Agent": USER_AGENT}
 
 
@@ -60,7 +60,7 @@ def scoreboard(day: date):
 
 
 # --------------------------------------------------------------------------- helpers
-PERIOD_LEN = lambda p: 1200 if p <= 2 else 300
+PERIOD_LEN = lambda p: PERIOD_SECONDS if p <= REG_PERIODS else 300  # noqa: E731  halves or quarters, then 5-min OTs
 
 
 def clock_secs(s: str) -> float:

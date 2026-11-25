@@ -21,9 +21,15 @@ STYLE_DIR = ARTIFACTS / "style"
 
 def crosswalk(season: int) -> pd.DataFrame:
     """D-I teams of a season: Torvik name <-> ESPN team id (columns torvik, team_id)."""
+    from ..config import WOMENS
     cw = pd.read_csv(ARTIFACTS / "crosswalk.csv", dtype={"espn_id": str})
     f = PROC / f"tv_games_{season}.parquet"
-    g = pd.read_parquet(f) if (season >= current_season() and f.exists()) else (
+    if WOMENS:  # women's games are built from ESPN (womens_data); team names = the identity crosswalk
+        g = pd.read_parquet(PROC / "games.parquet")
+        g = g[g["season"] == season]
+    else:
+        g = None
+    g = g if g is not None else pd.read_parquet(f) if (season >= current_season() and f.exists()) else (
         pd.read_parquet(history.path("tv_games", season)) if history.path("tv_games", season).exists()
         else pd.read_parquet(f))
     g = g[g["type"] != "nond1"]
@@ -44,8 +50,12 @@ def torvik_players(season: int) -> pd.DataFrame:
     p = p.rename(columns={"player": "name", "rec_rank": "rec_score"})
     for c in ("gp", "mpg", "min_pct", "blk_pct", "bpm", "rec_score"):
         p[c] = pd.to_numeric(p.get(c), errors="coerce")
+    if "blk_pct" not in p and "blk" in p:  # women's table: blocks per 40 minutes as the rim-protection proxy
+        p["blk_pct"] = 40 * pd.to_numeric(p["blk"], errors="coerce") / pd.to_numeric(p["mins"], errors="coerce").clip(lower=1)
     p["ht_in"] = p["ht"].map(_inches) if "ht" in p else np.nan
-    p.loc[(p["ht_in"] < 66) | (p["ht_in"] > 91), "ht_in"] = np.nan
+    from ..config import WOMENS
+    lo, hi = (58, 84) if WOMENS else (66, 91)
+    p.loc[(p["ht_in"] < lo) | (p["ht_in"] > hi), "ht_in"] = np.nan
     p["class_n"] = p["cls"].map({"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}).astype(float)
     p["minutes"] = p["mpg"].fillna(0) * p["gp"].fillna(0)
     if "role" not in p:

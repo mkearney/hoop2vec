@@ -24,7 +24,11 @@ CLS_NUM = {"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}
 
 
 def load_player_games(seasons, refresh_current=True) -> pd.DataFrame:
+    from .config import WOMENS
     frames = []
+    if WOMENS:  # built from ESPN box scores by womens_data.build()
+        return pd.concat([pd.read_parquet(PROC / f"pg_{s}.parquet") for s in seasons if (PROC / f"pg_{s}.parquet").exists()],
+                         ignore_index=True)
     for s in seasons:
         p = PROC / f"pg_{s}.parquet"
         if s >= current_season():
@@ -51,7 +55,11 @@ def load_player_games(seasons, refresh_current=True) -> pd.DataFrame:
 
 
 def load_player_seasons(seasons, refresh_current=True) -> pd.DataFrame:
+    from .config import WOMENS
     frames = []
+    if WOMENS:
+        return pd.concat([pd.read_parquet(PROC / f"ps_{s}.parquet") for s in seasons if (PROC / f"ps_{s}.parquet").exists()],
+                         ignore_index=True)
     for s in seasons:
         p = PROC / f"ps_{s}.parquet"
         if p.exists() and (espn_season.active(s) or not (refresh_current and s >= current_season())):

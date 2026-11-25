@@ -167,6 +167,21 @@ def blend(P: pd.DataFrame, a: str, b: str, w: float, name: str | None = None) ->
     return name
 
 
+def market_sigma(y, line) -> float:
+    """The line's spread -> P(win) scale that is best *for the market* (minimizes its own log loss, in sample).
+    Generous on purpose: margins are heavy-tailed (blowouts, above all in the women's game), so the RMSE of
+    margin vs line overstates the right scale and would make the benchmark look worse than it is."""
+    from scipy.optimize import minimize_scalar
+    w = (np.asarray(y) > 0).astype(float)
+    line = np.asarray(line, float)
+
+    def ll(s):
+        p = np.clip(norm.cdf(line / s), 1e-6, 1 - 1e-6)
+        return -np.mean(w * np.log(p) + (1 - w) * np.log(1 - p))
+    rmse = float(np.sqrt(np.mean((np.asarray(y) - line) ** 2)))
+    return float(minimize_scalar(ll, bounds=(0.3 * rmse, 2.0 * rmse), method="bounded").x)
+
+
 def summarize(P: pd.DataFrame, names, ref=None) -> dict:
     ref = ref or names[0]
     y = P["margin"].to_numpy()
@@ -191,8 +206,7 @@ def summarize(P: pd.DataFrame, names, ref=None) -> dict:
         r = {k: metrics(y[m], P.loc[m, f"p_{k}"].to_numpy(), P.loc[m, f"mu_{k}"].to_numpy()) for k in names}
         if sub.endswith("line_games"):
             lm = P.loc[m, "line_a"].to_numpy()
-            s = float(np.sqrt(np.mean((y[m] - lm) ** 2)))
-            r["market"] = metrics(y[m], norm.cdf(lm / s), lm)
+            r["market"] = metrics(y[m], norm.cdf(lm / market_sigma(y[m], lm)), lm)
         for k in names:
             if k != ref:
                 d, lo, hi = paired_ci(y[m], P.loc[m, f"p_{k}"].to_numpy(), P.loc[m, f"p_{ref}"].to_numpy())

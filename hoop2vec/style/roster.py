@@ -109,7 +109,7 @@ def torvik_roster(tp: pd.DataFrame, xw: pd.DataFrame) -> pd.DataFrame:
         rows.append(dict(
             team_id=tid,
             height=float((t["ht_in"] * w).sum() / hw.sum()) if hw.sum() > 0 else np.nan,
-            front_height=float(np.average(bigs["ht_in"].fillna(hts.mean() if len(hts) else 80),
+            front_height=float(np.average(bigs["ht_in"].fillna(hts.mean() if len(hts) else t["ht_in"].mean()),
                                           weights=bigs["minutes"])) if len(bigs) else np.nan,
             height_spread=float(hts.std()) if len(hts) > 2 else np.nan,
             wing_share=float(w[t["role"].isin(WING_ROLES)].sum()),

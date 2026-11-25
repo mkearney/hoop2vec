@@ -15,6 +15,11 @@ concurrency:
 jobs:
   retrain:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1          # one league at a time so the two commits don't race
+      matrix:
+        league: [mens, womens]
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -29,22 +34,22 @@ jobs:
       - name: Restore data cache
         uses: actions/cache/restore@v4
         with:
-          path: data
-          key: hoop2vec-data-${{ github.run_id }}
-          restore-keys: hoop2vec-data-
-      - name: Rebuild features, retrain the game models, rerun the backtest, publish
-        run: python -m hoop2vec all
+          path: data/${{ matrix.league }}
+          key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
+          restore-keys: hoop2vec-data-${{ matrix.league }}-
+      - name: Rebuild features, retrain, rerun the backtests, publish (${{ matrix.league }})
+        run: python -m hoop2vec all --${{ matrix.league }}
       - name: Save data cache (even if a later step fails)
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: data
-          key: hoop2vec-data-${{ github.run_id }}
+          path: data/${{ matrix.league }}
+          key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
       - name: Commit results
         run: |
           git config user.name "Michael W. Kearney"
           git config user.email "13401460+mkearney@users.noreply.github.com"
-          git add docs/data artifacts history
-          git diff --cached --quiet || git commit -m "Retrain + backtest $(date -u +%F)"
+          git add docs artifacts/${{ matrix.league }} history/${{ matrix.league }}
+          git diff --cached --quiet || git commit -m "Retrain + backtest (${{ matrix.league }}) $(date -u +%F)"
           git pull --rebase --autostash
           git push

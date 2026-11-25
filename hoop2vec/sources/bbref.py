@@ -86,3 +86,60 @@ def advanced(season: int, refresh: bool = False) -> pd.DataFrame:
 def season_table(season: int, refresh: bool = False) -> pd.DataFrame:
     """Advanced + per-game columns for one NBA season."""
     return advanced(season, refresh).merge(per_game(season, refresh), on=["season", "bbref_id"], how="left")
+
+
+# ------------------------------------------------------------------ WNBA (women's prospect models)
+WNBA_NUM = ["g", "mp", "per", "ts_pct", "efg_pct", "tpar", "ftr", "orb_pct", "trb_pct", "ast_pct", "stl_pct", "blk_pct",
+            "tov_pct", "usg_pct", "off_rtg", "def_rtg", "ows", "dws", "ws", "ws_per_40"]
+
+
+def _wnba_rows(table) -> pd.DataFrame:
+    rows = []
+    for tr in table.find("tbody").find_all("tr"):
+        if "thead" in (tr.get("class") or []):
+            continue
+        cell = tr.find(attrs={"data-stat": "player"})
+        if cell is None or cell.a is None:
+            continue
+        rec = {"bbref_id": cell.a["href"].split("/")[-1].split(".")[0], "name": cell.a.get_text(strip=True)}
+        for td in tr.find_all("td"):
+            rec[td.get("data-stat")] = td.get_text(strip=True)  # repeated stats (team splits): last one wins
+        rows.append(rec)
+    return pd.DataFrame(rows)
+
+
+def wnba_season(season: int, refresh: bool = False) -> pd.DataFrame:
+    """WNBA advanced + per-game line per player for a season (calendar year)."""
+    out = []
+    for page in ("advanced", "per_game"):
+        url = f"{BASE}/wnba/years/{season}_{page}.html"
+        raw = cached_bytes(url, OUT / f"WNBA_{season}_{page}.html", refresh=refresh)
+        t = BeautifulSoup(raw, "lxml").find("table", id=page)
+        out.append(_wnba_rows(t).drop_duplicates("bbref_id", keep="first"))
+    adv, pgm = out
+    adv = adv.rename(columns={"fg3a_per_fga_pct": "tpar", "fta_per_fga_pct": "ftr"})
+    pgm = pgm.rename(columns={"pts_per_g": "pts", "trb_per_g": "trb", "ast_per_g": "ast", "stl_per_g": "stl",
+                              "blk_per_g": "blk", "tov_per_g": "tov", "fg_pct": "fg_pct", "fg3_pct": "fg3_pct",
+                              "fg3a_per_g": "fg3a", "ft_pct": "ft_pct", "mp_per_g": "mpg"})
+    df = adv.merge(pgm[["bbref_id"] + [c for c in PER_GAME if c in pgm]], on="bbref_id", how="left")
+    for c in WNBA_NUM + PER_GAME:
+        df[c] = pd.to_numeric(df[c], errors="coerce") if c in df else float("nan")
+    df["season"] = season
+    return df[["season", "bbref_id", "name", "team", "pos"] + WNBA_NUM + PER_GAME]
+
+
+def wnba_draft(year: int, refresh: bool = False) -> pd.DataFrame:
+    url = f"{BASE}/wnba/draft/{year}.html"
+    raw = cached_bytes(url, OUT / f"WNBA_draft_{year}.html", refresh=refresh)
+    t = BeautifulSoup(raw, "lxml").find("table", id="stats")
+    rows = []
+    for tr in t.find("tbody").find_all("tr"):
+        pk = tr.find(attrs={"data-stat": "pick_overall"})
+        pl = tr.find(attrs={"data-stat": "player"})
+        if pk is None or pl is None or not pk.get_text(strip=True).isdigit():
+            continue
+        col = tr.find(attrs={"data-stat": "college"})
+        rows.append({"year": year, "pick": int(pk.get_text(strip=True)), "name": pl.get_text(strip=True),
+                     "bbref_id": pl.a["href"].split("/")[-1].split(".")[0] if pl.a else None,
+                     "college": col.get_text(strip=True) if col else None})
+    return pd.DataFrame(rows)

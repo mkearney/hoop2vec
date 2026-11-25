@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..config import RAW, season_dates, today
+from ..config import ESPN_BASE, RAW, season_dates, today
 from ..http import get
 
-BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball"
+BASE = ESPN_BASE
 OUT = RAW / "espn"
 
 
@@ -128,7 +128,9 @@ def tournament_games(season: int) -> pd.DataFrame:
     if df.empty:
         return df
     df = df[df["notes"].fillna("").str.contains("Championship", case=False)]
-    df = df[~df["notes"].fillna("").str.contains("Women", case=False)]
+    from ..config import WOMENS
+    is_w = df["notes"].fillna("").str.contains("Women", case=False)
+    df = df[is_w] if WOMENS else df[~is_w]
     return df.reset_index(drop=True)
 
 

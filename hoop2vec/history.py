@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .config import ROOT, current_season
+from .config import HIST, current_season
 
-HIST = ROOT / "history"
+
 
 PG_COLS = ["season", "muid", "team", "pid", "cls", "inches", "min", "bpm", "obpm", "dbpm"]
 PS_COLS = ["season", "player", "team", "pid", "cls", "gp", "mpg", "bpm", "obpm", "dbpm", "rec_rank", "conf",

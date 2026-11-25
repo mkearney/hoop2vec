@@ -4,5 +4,5 @@ __pycache__/
 .venv/
 .DS_Store
 *.egg-info/
-artifacts/style/train_table.parquet
-artifacts/backtest_games.parquet
+artifacts/*/style/train_table.parquet
+artifacts/*/backtest_games.parquet

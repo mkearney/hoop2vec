@@ -69,6 +69,24 @@ def utcnow() -> str:
 def stage_data(refresh=True):
     from . import espn_fallback, history
     from . import lines as L
+    from .config import WOMENS
+    if WOMENS:
+        from . import womens_data
+        cur = current_season()
+        from .ingest import ingest_season, season_dir
+        for s in range(FIRST_SEASON, cur):  # a fresh data cache (e.g. CI) needs the completed seasons once
+            if not (season_dir(s) / "player_games.parquet").exists():
+                log(f"play-by-play + box scores {s} (ESPN, one-time)")
+                ingest_season(s)
+        if refresh:
+            log("play-by-play + box scores (current season, ESPN)")
+            ingest_season(cur)
+        log("women's games, players and conferences (ESPN)")
+        out = womens_data.build(refresh=refresh)
+        lines = L.collect()
+        if len(lines):
+            L.save(lines)
+        return out
     seasons = list(range(FIRST_SEASON, current_season() + 1))
     cur = current_season()
     log("fetching games (Torvik + ESPN)")
@@ -143,7 +161,8 @@ def stage_backtest(feat, seasons=None, n_models=3):
     """Season-ahead backtest of every candidate; picks the blend weight; writes artifacts + site JSON."""
     from . import lines as L
     log("season-ahead backtest")
-    seasons = seasons or list(range(2012, current_season()))
+    # first test season needs a few training seasons before it (women's: train 2020-21 -> test 2022 onward)
+    seasons = seasons or list(range(FIRST_TRAIN_SEASON + 2 if FIRST_TRAIN_SEASON >= 2015 else 2012, current_season()))
     games = pd.read_parquet(PROC / "games.parquet")
     la = L.for_games(feat, games, L.collect())
     mm = [c for c in F.TEAM_FEATS if not c.startswith("k_")]
@@ -223,6 +242,8 @@ def load_bundle(feat=None):
 # ------------------------------------------------------------------------ publish
 def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     season = current_season()
+    from . import site
+    site.write()
     bundle = load_bundle(feat)
     models, norm, smeans = bundle["nets"]
     state = PR.team_state(snaps, extras, conf, meta, season)
@@ -410,8 +431,10 @@ def stage_identity(season):
 def venue_list():
     v = []
     cfg = BR.load_config()
-    groups = (("Opening round", cfg.get("opening_sites", BR.DEFAULT_SITES["opening_sites"])),
-              ("First/second round", cfg.get("first_round_sites", BR.DEFAULT_SITES["first_round_sites"])),
+    fr = cfg.get("first_round_sites", BR.DEFAULT_SITES["first_round_sites"])
+    op = cfg.get("opening_sites", BR.DEFAULT_SITES["opening_sites"])
+    groups = (("Opening round", [] if op == "campus" else op),
+              ("First/second round", [] if fr == "campus" else fr),
               ("Regional", [r["site"] for r in cfg.get("regions", BR.DEFAULT_SITES["regions"])]),
               ("Final Four", [cfg.get("final_four_site", BR.DEFAULT_SITES["final_four_site"])]))
     for name, lst in groups:

@@ -26,14 +26,25 @@ import numpy as np
 import pandas as pd
 
 from . import history
-from .config import ARTIFACTS, PROC, current_season
+from .config import ARTIFACTS, PRO, PROC, WOMENS, current_season
 from .sources.injuries import norm_name
 
-FIRST = 2008
-WINDOW = 4                # NBA seasons after leaving college that define the outcome
-SUCCESS_WS = 8.0          # 4-year Win Shares: an established NBA rotation player
-STAR_WS = 20.0            # 4-year Win Shares: a starter-plus / star-level start
-THRESHOLDS = (5, 14, 30, 60)
+if WOMENS:
+    # WNBA: 3-round draft in April, rookie season the same calendar year; 40-44 game seasons (so smaller Win Shares)
+    FIRST, PRO_FIRST = 2019, 2018   # college data (ESPN box scores) / first WNBA season fetched
+    WINDOW, OFFSET = 3, 0           # outcome = WNBA seasons S..S+2 after a final college season S
+    SUCCESS_WS, STAR_WS = 2.5, 5.0  # 3-year WNBA Win Shares: a rotation player (~top 15% of picks) / a star-level start
+    THRESHOLDS = (4, 12, 24, 36)    # top 4, first round, top 24, drafted (three rounds)
+    FIRST_ROUND = 12
+else:
+    FIRST, PRO_FIRST = 2008, 2009
+    WINDOW, OFFSET = 4, 1           # outcome = NBA seasons S+1..S+4 after a final college season S
+    SUCCESS_WS = 8.0                # 4-year Win Shares: an established NBA rotation player
+    STAR_WS = 20.0                  # 4-year Win Shares: a starter-plus / star-level start
+    THRESHOLDS = (5, 14, 30, 60)
+    FIRST_ROUND = 30
+K_TOP, K_LOT, K_3, K_ALL = (f"p{k}" for k in THRESHOLDS)  # column names of the cumulative draft probabilities
+K_FR = f"p{FIRST_ROUND}"
 ROLES = ["Pure PG", "Scoring PG", "Combo G", "Wing G", "Wing F", "Stretch 4", "PF/C", "C"]
 CLS_N = {"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}
 PRIOR_PREV_MIN = 400.0    # last season's weight (minutes) in this season's shrunk rates
@@ -44,14 +55,25 @@ RATES = ["ortg", "usg", "efg", "ts", "orb_pct", "drb_pct", "ast_pct", "to_pct", 
          "rim_pct", "mid_rate", "dunk40", "ast_tov"]
 FEATURES = (["age", "ht", "cls_n", "rec", "has_rec", "n_seasons", "min_pct", "mpg", "team_em", "conf_em"]
             + [f"r_{c}" for c in RATES] + ["prev_bpm", "d_bpm"] + [f"role_{r}" for r in ROLES])
+if WOMENS:  # no free birth dates or recruiting ranks for women's college players
+    FEATURES = [c for c in FEATURES if c not in ("age", "rec", "has_rec", "r_ortg", "r_drtg", "r_gbpm", "r_porpag",
+                                                 "r_dporpag", "r_dunk40")]  # nor Torvik-only ratings
 
 
 # ------------------------------------------------------------------ data
 def college(seasons=None, refresh_current: bool = False) -> pd.DataFrame:
-    """Torvik player-season tables: committed history for completed seasons + live file for the current one."""
+    """Torvik player-season tables: committed history for completed seasons + live file for the current one.
+    Women's: the same columns built from ESPN box scores, with WNBA draft picks attached."""
     from .sources import torvik
     cur = current_season()
     seasons = seasons or list(range(FIRST, cur + 1))
+    if WOMENS:
+        from .womens_data import college_players
+        c = college_players(seasons)
+        dr = wnba_drafts()
+        if len(dr):
+            c = attach_wnba_picks(c, dr)
+        return c
     frames = []
     hist = pd.read_parquet(history.path("college_players")) if history.path("college_players").exists() else None
     for s in seasons:
@@ -81,11 +103,44 @@ def college(seasons=None, refresh_current: bool = False) -> pd.DataFrame:
 
 
 def nba_seasons() -> pd.DataFrame:
+    """Pro seasons (NBA, or WNBA for the women's site) from basketball-reference (committed history)."""
     p = history.path("nba_seasons")
+    if p.exists():
+        n = pd.read_parquet(p)
+    else:
+        from .sources import bbref
+        fetch = bbref.wnba_season if WOMENS else bbref.season_table
+        n = pd.concat([fetch(s) for s in range(PRO_FIRST, current_season())], ignore_index=True)
+    for c in ("age", "vorp", "bpm"):
+        if c not in n:
+            n[c] = np.nan
+    return n
+
+
+def wnba_drafts() -> pd.DataFrame:
+    p = history.path("wnba_drafts")
     if p.exists():
         return pd.read_parquet(p)
     from .sources import bbref
-    return pd.concat([bbref.season_table(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
+    return pd.concat([bbref.wnba_draft(y) for y in range(FIRST, current_season())], ignore_index=True)
+
+
+def attach_wnba_picks(c: pd.DataFrame, dr: pd.DataFrame) -> pd.DataFrame:
+    """Draft pick per college player: same normalized name, drafted the April after her last college season
+    (college name checked when it disambiguates). Stored like Torvik's pick column (on every season)."""
+    c = c.copy()
+    last = c.groupby("pid")["season"].max()
+    team_last = c.sort_values("season").groupby("pid")["team"].last()
+    car = pd.DataFrame({"last": last, "team": team_last, "nk": c.sort_values("season").groupby("pid")["player"].last().map(_nk)})
+    dr = dr.assign(nk=dr["name"].map(_nk))
+    m = car.reset_index().merge(dr, on="nk")
+    m = m[(m["year"] - m["last"]).between(0, 1)]
+    tk = lambda x: norm_name(str(x)).replace("state", "st").split(" ")[0]  # noqa: E731
+    m["college_ok"] = [tk(a) == tk(b) for a, b in zip(m["team"], m["college"])]
+    m = m.sort_values(["college_ok", "pick"], ascending=[False, True]).drop_duplicates("pid").drop_duplicates(["year", "pick"])
+    c["pick"] = c["pid"].map(m.set_index("pid")["pick"])
+    c.attrs["wnba_link"] = m[["pid", "bbref_id"]].dropna()
+    return c
 
 
 HIST_COLS = ["season", "pid", "player", "team", "conf", "cls", "ht", "role", "dob", "pick", "rec_rank", "gp", "mpg",
@@ -133,6 +188,8 @@ def match_nba(col: pd.DataFrame, nba: pd.DataFrame) -> pd.DataFrame:
     "Bam" Adebayo, "Bub" Carrington): same last name, unique candidate with matching debut window and age.
     NBA players already in the league in the first season of our NBA data can't be told apart from debuts, so
     they are never matched."""
+    if "dob" not in col:
+        col = col.assign(dob=None)
     car = col.sort_values("season").groupby("pid").agg(name=("player", "last"), last=("season", "max"),
                                                        dob=("dob", "last"), pick=("pick", "max"))
     car["nk"] = car["name"].map(_nk)
@@ -147,13 +204,17 @@ def match_nba(col: pd.DataFrame, nba: pd.DataFrame) -> pd.DataFrame:
     def candidates(key):
         pr = car.reset_index().merge(deb.reset_index(), on=key, suffixes=("", "_n"))
         gap = pr["debut"] - pr["last"]
-        pr = pr[(gap >= 1) & (gap <= WINDOW + 1)]
+        pr = pr[(gap >= OFFSET) & (gap <= OFFSET + WINDOW)]
         feb1 = pd.to_datetime(pr["debut"].astype(str) + "-02-01")
         age = ((feb1 - pr["dob"]).dt.days / 365.25).apply(np.floor)
         pr = pr[(age.isna()) | ((age - pr["age"]).abs() <= 1)]
         return pr.assign(gap=(pr["debut"] - pr["last"]), drafted=pr["pick"].notna())
 
     used_p, used_b, out = set(), set(), []
+    for r in getattr(col, "attrs", {}).get("wnba_link", pd.DataFrame(columns=["pid", "bbref_id"])).itertuples():
+        if r.pid not in used_p and r.bbref_id not in used_b:  # women's: drafted players link directly via the draft page
+            used_p.add(r.pid); used_b.add(r.bbref_id)
+            out.append((r.pid, r.bbref_id))
     p1 = candidates("nk").sort_values(["gap", "drafted"], ascending=[True, False])
     for r in p1.itertuples():
         if r.pid in used_p or r.bbref_id in used_b:
@@ -172,7 +233,7 @@ def outcomes(col: pd.DataFrame, nba: pd.DataFrame, link: pd.DataFrame) -> pd.Dat
     """First WINDOW NBA seasons after leaving college, per pid (zeros if he never played)."""
     last = col.groupby("pid")["season"].max().rename("last")
     o = link.merge(last, left_on="pid", right_index=True).merge(nba, on="bbref_id")
-    o = o[(o["season"] > o["last"]) & (o["season"] <= o["last"] + WINDOW)]
+    o = o[(o["season"] >= o["last"] + OFFSET) & (o["season"] < o["last"] + OFFSET + WINDOW)]
     o["bpm_x_mp"] = o["bpm"] * o["mp"]
     g = o.groupby("pid").agg(nba_seasons=("season", "nunique"), nba_mp=("mp", "sum"), nba_ws=("ws", "sum"),
                              nba_vorp=("vorp", "sum"), bpm_x_mp=("bpm_x_mp", "sum"), nba_g=("g", "sum"))
@@ -183,7 +244,7 @@ def outcomes(col: pd.DataFrame, nba: pd.DataFrame, link: pd.DataFrame) -> pd.Dat
         out[c] = out[c].fillna(0.0)
     out["last"] = last
     # complete outcome window, and an exit after the first season of NBA data (see match_nba)
-    out["mature"] = (out["last"] + WINDOW <= nba["season"].max()) & (out["last"] >= nba["season"].min())
+    out["mature"] = (out["last"] + OFFSET + WINDOW - 1 <= nba["season"].max()) & (out["last"] >= nba["season"].min() + 1 - OFFSET)
     out["success"] = out["nba_ws"] >= SUCCESS_WS
     out["star"] = out["nba_ws"] >= STAR_WS
     return out
@@ -193,7 +254,12 @@ def outcomes(col: pd.DataFrame, nba: pd.DataFrame, link: pd.DataFrame) -> pd.Dat
 def team_context(seasons) -> pd.DataFrame:
     from .features import conferences
     c = conferences(seasons)
-    c = c.assign(team_em=c["t_adjoe"] - c["t_adjde"])
+    if WOMENS:  # no T-Rank: our own adjusted efficiency margin, as of each team's last game of the season
+        sn = pd.read_parquet(PROC / "snapshots.parquet").sort_values("snap")
+        em = sn.groupby(["season", "team"])["adjem"].last().rename("team_em").reset_index()
+        c = c.drop(columns=["team_em"], errors="ignore").merge(em, on=["season", "team"], how="left")
+    else:
+        c = c.assign(team_em=c["t_adjoe"] - c["t_adjde"])
     c["conf_em"] = c.groupby(["season", "conf"])["team_em"].transform("mean")
     return c[["season", "team", "team_em", "conf_em"]].drop_duplicates(["season", "team"])
 
@@ -261,7 +327,9 @@ def build_table(refresh_current: bool = False):
     """Features + labels for every player-season 2008..now."""
     col = college(refresh_current=refresh_current)
     nba = nba_seasons()
-    link = match_nba(col[col["season"] < current_season()], nba)
+    done = col[col["season"] < current_season()]
+    done.attrs = col.attrs
+    link = match_nba(done, nba)
     out = outcomes(col[col["season"] < current_season()], nba, link)
     T = features(col)
     last = col.groupby("pid")["season"].max()
@@ -272,6 +340,9 @@ def build_table(refresh_current: bool = False):
     for c in ("nba_seasons", "nba_mp", "nba_ws", "nba_vorp", "nba_bpm", "nba_g", "success", "star", "mature", "bbref_id"):
         T[c] = o[c].to_numpy()
     T["last"] = T["pid"].map(last)
+    for c in ("age", "rec", "has_rec"):  # not modeled for women (no free data), kept as empty columns
+        if c not in T:
+            T[c] = np.nan
     return T, col, nba, link
 
 
@@ -291,7 +362,8 @@ def _logit(cols):
     return cols, make_pipeline(SimpleImputer(strategy="median"), StandardScaler(), LogisticRegression(C=0.5, max_iter=2000))
 
 
-BASE_COLS = ["rec", "has_rec", "r_bpm", "age"]   # the "simple scout" baseline: recruiting + BPM + age
+# the "simple scout" baseline: recruiting + BPM + age (women's: no recruiting/age data -> class + BPM + height)
+BASE_COLS = ["cls_n", "r_bpm", "ht"] if WOMENS else ["rec", "has_rec", "r_bpm", "age"]
 
 
 def draft_rows(T):
@@ -345,7 +417,7 @@ class SuccessModel:
     for Win Shares. With ~15-20 NBA successes per class, these beat gradient boosting out of sample (boosting
     overfits; see the backtest), and feeding them the draft model's projection added nothing."""
 
-    def __init__(self, kind="glm", C=0.05):
+    def __init__(self, kind="glm", C=0.02 if WOMENS else 0.05):  # women: fewer successes -> more shrinkage (backtest-tuned)
         self.kind, self.C = kind, C
 
     def _pipe(self, est):
@@ -393,10 +465,11 @@ def _ll(y, p):
     return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
 
-def backtest(T, first=2012):
+def backtest(T, first=None):
     """Forward-chained by draft year: train on seasons before Y, score season Y (draft) / players leaving in Y
     (success). Benchmarks: a recruiting+BPM+age logistic baseline, and for success the actual draft slot."""
     from scipy.stats import spearmanr
+    first = first or (2021 if WOMENS else 2012)  # first test class (needs >= 2 earlier classes to train on)
     D = draft_rows(T)
     res_d, rows_d = [], []
     for Y in range(first, current_season()):
@@ -411,13 +484,13 @@ def backtest(T, first=2012):
         rank_m = g["draft_score"].rank(ascending=False)
         rank_b = g["base_draft_score"].rank(ascending=False)
         res_d.append({"year": Y, "n_drafted": int(len(dr)),
-                      "auc_drafted": _auc(g["drafted"], g["p60"]), "auc_drafted_base": _auc(g["drafted"], g["base_p60"]),
-                      "ll_drafted": _ll(g["drafted"], g["p60"]), "ll_drafted_base": _ll(g["drafted"], g["base_p60"]),
-                      "auc_lottery": _auc(g["pick_now"] <= 14, g["p14"]), "auc_lottery_base": _auc(g["pick_now"] <= 14, g["base_p14"]),
+                      "auc_drafted": _auc(g["drafted"], g[K_ALL]), "auc_drafted_base": _auc(g["drafted"], g["base_" + K_ALL]),
+                      "ll_drafted": _ll(g["drafted"], g[K_ALL]), "ll_drafted_base": _ll(g["drafted"], g["base_" + K_ALL]),
+                      "auc_lottery": _auc(g["pick_now"] <= THRESHOLDS[1], g[K_LOT]), "auc_lottery_base": _auc(g["pick_now"] <= THRESHOLDS[1], g["base_" + K_LOT]),
                       "spearman_pick": float(spearmanr(rank_m[dr.index], dr["pick_now"]).statistic),
                       "spearman_pick_base": float(spearmanr(rank_b[dr.index], dr["pick_now"]).statistic),
-                      "top30_hits": int(g.sort_values("draft_score", ascending=False).head(30)["drafted"].sum()),
-                      "top30_hits_base": int(g.sort_values("base_draft_score", ascending=False).head(30)["drafted"].sum())})
+                      "top30_hits": int(g.sort_values("draft_score", ascending=False).head(FIRST_ROUND)["drafted"].sum()),
+                      "top30_hits_base": int(g.sort_values("base_draft_score", ascending=False).head(FIRST_ROUND)["drafted"].sum())})
     S = success_rows(T)
     res_s, rows_s = [], []
     for Y in range(first, int(S["last"].max()) + 1):
@@ -450,11 +523,11 @@ def summarize_backtest(rd, gd, rs, gs) -> dict:
     rb = gd.groupby("season")["base_draft_score"].rank(ascending=False)
     out["draft"] = {
         "years": [int(gd["season"].min()), int(gd["season"].max())], "n_rows": int(len(gd)), "n_drafted": int(len(dr)),
-        "model": {"auc_drafted": _auc(gd["drafted"], gd["p60"]), "auc_lottery": _auc(gd["pick_now"] <= 14, gd["p14"]),
-                  "ll_drafted": _ll(gd["drafted"], gd["p60"]), "spearman_pick": float(spearmanr(rm[dr.index], dr["pick_now"]).statistic),
+        "model": {"auc_drafted": _auc(gd["drafted"], gd[K_ALL]), "auc_lottery": _auc(gd["pick_now"] <= THRESHOLDS[1], gd[K_LOT]),
+                  "ll_drafted": _ll(gd["drafted"], gd[K_ALL]), "spearman_pick": float(spearmanr(rm[dr.index], dr["pick_now"]).statistic),
                   "top30_hits": float(rd["top30_hits"].mean())},
-        "baseline": {"auc_drafted": _auc(gd["drafted"], gd["base_p60"]), "auc_lottery": _auc(gd["pick_now"] <= 14, gd["base_p14"]),
-                     "ll_drafted": _ll(gd["drafted"], gd["base_p60"]), "spearman_pick": float(spearmanr(rb[dr.index], dr["pick_now"]).statistic),
+        "baseline": {"auc_drafted": _auc(gd["drafted"], gd["base_" + K_ALL]), "auc_lottery": _auc(gd["pick_now"] <= THRESHOLDS[1], gd["base_" + K_LOT]),
+                     "ll_drafted": _ll(gd["drafted"], gd["base_" + K_ALL]), "spearman_pick": float(spearmanr(rb[dr.index], dr["pick_now"]).statistic),
                      "top30_hits": float(rd["top30_hits_base"].mean())},
         "per_year": rd.to_dict(orient="records"),
     }
@@ -509,7 +582,7 @@ def _sanitize(x):
 LABELS = {
     "age": "Age on draft day", "ht": "Height", "cls_n": "Class", "rec": "Recruiting score", "has_rec": "Ranked recruit",
     "n_seasons": "College seasons", "min_pct": "Share of team minutes", "mpg": "Minutes per game",
-    "team_em": "Team strength (T-Rank margin)", "conf_em": "Conference strength", "r_ortg": "Offensive rating",
+    "team_em": "Team strength (adjusted margin)" if WOMENS else "Team strength (T-Rank margin)", "conf_em": "Conference strength", "r_ortg": "Offensive rating",
     "r_usg": "Usage", "r_efg": "eFG%", "r_ts": "True shooting", "r_orb_pct": "Off. rebound rate", "r_drb_pct": "Def. rebound rate",
     "r_ast_pct": "Assist rate", "r_to_pct": "Turnover rate", "r_blk_pct": "Block rate", "r_stl_pct": "Steal rate",
     "r_ftr": "Free-throw rate", "r_pfr": "Fouls per 40", "r_bpm": "Box plus/minus", "r_obpm": "Offensive BPM",
@@ -560,7 +633,7 @@ def run_backtest(T) -> dict:
     ly = int(gd["season"].max())
     last = gd[gd["season"] == ly].sort_values("draft_score", ascending=False).head(30)
     S["draft"]["last_draft"] = {"year": ly, "board": [
-        {"rank": i + 1, "name": r.player, "team": r.team, "p30": round(float(r.p30), 3), "pick": None if pd.isna(r.pick_now) else int(r.pick_now)}
+        {"rank": i + 1, "name": r.player, "team": r.team, K_FR: round(float(getattr(r, K_FR)), 3), "pick": None if pd.isna(r.pick_now) else int(r.pick_now)}
         for i, r in enumerate(last.itertuples())]}
     my = int(gs["season"].max())
     cls = gs[gs["season"] == my].sort_values("p_success", ascending=False).head(20)
@@ -589,13 +662,13 @@ def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
     season = season or current_season()
     D, S = draft_rows(T), success_rows(T)
     dm, sm = DraftModel("hgb").fit(D), SuccessModel("glm").fit(S)
-    cur = T[(T["season"] == season) & (T["mpg"].fillna(0) >= 5) & T["age"].notna()].copy()
+    cur = T[(T["season"] == season) & (T["mpg"].fillna(0) >= 5) & (T["age"].notna() | WOMENS)].copy()
     if cur.empty:
         return None
     cur = cur.join(dm.predict(cur)).join(sm.predict(cur))
     bt = json.loads(BT_PATH.read_text()) if BT_PATH.exists() else None
     platt = (bt or {}).get("success", {}).get("platt")
-    if platt:
+    if platt and platt["b"] <= 1:  # only ever soften: a slope > 1 fitted on a few dozen successes would sharpen noise
         z = np.log(cur["p_success"].clip(1e-5, 1 - 1e-5) / (1 - cur["p_success"].clip(1e-5, 1 - 1e-5)))
         cur["p_success"] = 1 / (1 + np.exp(-(platt["a"] + platt["b"] * z)))
         cur["p_star"] = np.minimum(cur["p_star"], cur["p_success"])
@@ -618,14 +691,16 @@ def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
             "pts": r.pts_pg, "reb": r.trb_pg, "ast": r.ast_pg, "stl": r.stl_pg, "blk": r.blk_pg, "bpm": r.bpm_raw,
             "obpm": r.obpm, "dbpm": r.dbpm, "usg": r.usg_raw, "ts": r.ts_raw, "ast_pct": r.ast_pct, "to_pct": r.to_pct,
             "blk_pct": r.blk_pct, "stl_pct": r.stl_pct, "tp_pct": (100 * r.tpm / r.tpa) if r.tpa else None, "tpa": r.tpa / max(r.gp, 1),
-            "board": int(r.board), "succ_rank": int(r.succ_rank), "draft_score": r.draft_score, "p5": r.p5, "p14": r.p14, "p30": r.p30, "p60": r.p60,
+            "board": int(r.board), "succ_rank": int(r.succ_rank), "draft_score": r.draft_score, **{f"p{k}": r[f"p{k}"] for k in THRESHOLDS},
             "p_success": r.p_success, "p_star": r.p_star, "exp_ws": r.exp_ws, **c})
     hist_rates = {}
-    for lo, hi in ((1, 5), (6, 14), (15, 30), (31, 60)):
+    tiers = list(zip((1,) + tuple(t + 1 for t in THRESHOLDS[:-1]), THRESHOLDS))
+    for lo, hi in tiers:
         x = hist[hist["pick_now"].between(lo, hi)]
         hist_rates[f"{lo}-{hi}"] = {"n": int(len(x)), "success": float(x["success"].mean()), "star": float(x["star"].mean()),
                                     "median_ws": float(x["nba_ws"].median())}
-    out = {"season": season, "draft_year": season, "n_players": int(len(cur)), "window": WINDOW,
+    out = {"season": season, "draft_year": season, "n_players": int(len(cur)), "window": WINDOW, "pro": PRO,
+           "womens": WOMENS, "thresholds": list(THRESHOLDS), "pro_first": PRO_FIRST, "pro_last": int(nba["season"].max()),
            "success_ws": SUCCESS_WS, "star_ws": STAR_WS, "train": {"draft_years": [int(D["season"].min()), int(D["season"].max())],
            "success_classes": [int(S["last"].min()), int(S["last"].max())], "n_draft_rows": int(len(D)), "n_success_rows": int(len(S))},
            "by_slot": hist_rates,
@@ -640,5 +715,8 @@ def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
 def update_history():
     """After an NBA season ends: refetch completed NBA seasons and refresh the committed college history."""
     from .sources import bbref
-    nba = pd.concat([bbref.season_table(s) for s in range(FIRST + 1, current_season())], ignore_index=True)
+    fetch = bbref.wnba_season if WOMENS else bbref.season_table
+    nba = pd.concat([fetch(s) for s in range(PRO_FIRST, current_season())], ignore_index=True)
+    if WOMENS:
+        history._w(pd.concat([bbref.wnba_draft(y) for y in range(FIRST, current_season())]), history.path("wnba_drafts"))
     save_history(college(), nba)

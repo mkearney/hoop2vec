@@ -24,19 +24,27 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .prospects import FEATURES, WINDOW
+from .config import WOMENS
+from .prospects import FEATURES, OFFSET, WINDOW
 
+# WNBA pages on basketball-reference have no DRB%/BPM: total rebound rate and Win Shares per 40 stand in
 NBA_DIMS = ["usg_pct", "ts_pct", "tpar", "ftr", "orb_pct", "drb_pct", "ast_pct", "stl_pct", "blk_pct", "tov_pct", "bpm"]
+if WOMENS:
+    NBA_DIMS = [{"drb_pct": "trb_pct", "bpm": "ws_per_40"}.get(d, d) for d in NBA_DIMS]
 DIM_LABELS = {"usg_pct": "Usage", "ts_pct": "True shooting", "tpar": "3PA rate", "ftr": "FT rate", "orb_pct": "Off. reb%",
               "drb_pct": "Def. reb%", "ast_pct": "Assist%", "stl_pct": "Steal%", "blk_pct": "Block%", "tov_pct": "Turnover%",
-              "bpm": "BPM"}
+              "bpm": "BPM", "trb_pct": "Total reb%", "ws_per_40": "WS / 40"}
 LINE = ["pts", "trb", "ast", "stl", "blk", "fg3_pct", "fg3a", "mpg"]
-MIN_NBA_MP = 500
+MIN_NBA_MP = 250 if WOMENS else 500       # early-career minutes needed for a usable pro profile (WNBA seasons are ~40 games)
+POOL_MP = 1000 if WOMENS else 2000        # "plays like" pool: pro players with at least this many minutes
+VALIDATE_FIRST = 2021 if WOMENS else 2013
 POS_GROUP = {"PG": "G", "SG": "G", "G": "G", "SF": "W", "GF": "W", "F": "W", "PF": "B", "C": "B", "FC": "B"}
 ROLE_GROUP = {"Pure PG": "G", "Scoring PG": "G", "Combo G": "G", "Wing G": "W", "Wing F": "W", "Stretch 4": "B",
               "PF/C": "B", "C": "B"}
 RAW_COLS = ["age", "ht", "r_bpm", "r_obpm", "r_dbpm", "r_usg", "r_ts", "r_ast_pct", "r_to_pct", "r_blk_pct", "r_stl_pct",
             "r_tpa40", "r_drb_pct", "r_orb_pct", "r_ftr", "rec"]
+if WOMENS:
+    RAW_COLS = [c for c in RAW_COLS if c not in ("age", "rec")]
 
 
 def _pos_group(pos: str) -> str | None:
@@ -63,7 +71,7 @@ def nba_profiles(nba: pd.DataFrame, link: pd.DataFrame, last: pd.Series):
             nba[c] = np.nan
     # (a) early-career profile of college players
     o = link.merge(last.rename("last").reset_index(), on="pid").merge(nba, on="bbref_id")
-    o = o[(o["season"] > o["last"]) & (o["season"] <= o["last"] + WINDOW) & (o["mp"] > 0)]
+    o = o[(o["season"] >= o["last"] + OFFSET) & (o["season"] < o["last"] + OFFSET + WINDOW) & (o["mp"] > 0)]
     early = o.groupby("pid").apply(lambda d: pd.concat([_wavg(d, NBA_DIMS + LINE),
                                                         pd.Series({"nba_mp": d["mp"].sum(), "nba_ws": d["ws"].sum(),
                                                                    "nba_seasons": d["season"].nunique(),
@@ -76,7 +84,7 @@ def nba_profiles(nba: pd.DataFrame, link: pd.DataFrame, last: pd.Series):
                                        pd.Series({"name": d["name"].iloc[-1], "mp": d["mp"].sum(), "ws": d["ws"].sum(),
                                                   "from": int(d["season"].min()), "to": int(d["season"].max()),
                                                   "pos": d.sort_values("mp")["pos"].iloc[-1]})]), include_groups=False)
-    car = car[car["mp"] >= 2000]
+    car = car[car["mp"] >= POOL_MP]
     car["group"] = car["pos"].map(_pos_group)
     return early, car
 
@@ -116,7 +124,7 @@ def _final_rows(T, early):
     return F.join(early[NBA_DIMS].add_prefix("y_"), on="pid")
 
 
-def validate(T, early, first=2013, weights: np.ndarray | None = None, ht_sd: float | None = None) -> dict:
+def validate(T, early, first=VALIDATE_FIRST, weights: np.ndarray | None = None, ht_sd: float | None = None) -> dict:
     """Forward-chained by class: translation R^2 per NBA dimension, and comps quality (learned vs raw metric).
     ``weights``: per-dimension weights for the learned comp distance (the live R^2 weights); 1 if None."""
     F = _final_rows(T, early)
@@ -124,7 +132,7 @@ def validate(T, early, first=2013, weights: np.ndarray | None = None, ht_sd: flo
     preds, rows = [], []
     for Y in range(first, int(F["season"].max()) + 1):
         tr, te = F[F["season"] < Y], F[F["season"] == Y]
-        if len(te) < 5 or len(tr) < 100:
+        if len(te) < 5 or len(tr) < (40 if WOMENS else 100):
             continue
         tm = Translator().fit(tr, tr[Ycols].set_axis(NBA_DIMS, axis=1))
         pz = tm.predict_z(te)
@@ -171,7 +179,7 @@ def build(T, early, car, prospects: pd.DataFrame, k_college=5, k_style=5, k_rate
     tm = Translator().fit(F, F[Ycols].set_axis(NBA_DIMS, axis=1))
     w = np.ones(len(NBA_DIMS))  # equal weights validated better than R^2 weights (see module docstring)
     # historical pool: every college player-season of a finished career (classes with an NBA window started)
-    H = T[(T["last"] < prospects["season"].max()) & (T["mpg"].fillna(0) >= 10) & T["age"].notna()].copy()
+    H = T[(T["last"] < prospects["season"].max()) & (T["mpg"].fillna(0) >= 10) & (T["age"].notna() | WOMENS)].copy()
     H["nba"] = H["pid"].isin(early.index)
     Hz = tm.predict_z(H)
     Pz = tm.predict_z(prospects)
@@ -182,7 +190,7 @@ def build(T, early, car, prospects: pd.DataFrame, k_college=5, k_style=5, k_rate
     ht_sd = HT_SD
     out = []
     for i, (idx, p) in enumerate(prospects.iterrows()):
-        same = (H["cls_n"] == p["cls_n"]) & ((H["age"] - p["age"]).abs() <= 1.5)
+        same = (H["cls_n"] == p["cls_n"]) & (((H["age"] - p["age"]).abs() <= 1.5) | WOMENS)  # no free birth dates for women
         cand = np.flatnonzero(same.to_numpy())
         d = np.sqrt((((Hz[cand] - Pz[i]) * w) ** 2).sum(1) + ((H["ht"].to_numpy()[cand] - p["ht"]) / ht_sd) ** 2
                     if not np.isnan(p["ht"]) else (((Hz[cand] - Pz[i]) * w) ** 2).sum(1))
@@ -212,7 +220,7 @@ def build(T, early, car, prospects: pd.DataFrame, k_college=5, k_style=5, k_rate
             if len(comps) >= k_college:
                 break
         # plays like: NBA players with the closest actual profile to this projected one
-        grp = ROLE_GROUP.get(p.get("role"))
+        grp = _pos_group(p.get("pos")) if WOMENS else ROLE_GROUP.get(p.get("role"))
         dd = np.sqrt((((cz - Pz[i]) * w) ** 2).sum(1))
         if grp:
             dd = dd + np.where(car["group"].to_numpy() == grp, 0.0, 0.75)
@@ -220,7 +228,8 @@ def build(T, early, car, prospects: pd.DataFrame, k_college=5, k_style=5, k_rate
         for j in np.argsort(dd)[:k_style]:
             c = car.iloc[j]
             sty.append({"name": c["name"], "pos": c["pos"], "years": f"{int(c['from'])}–{int(c['to'])}", "ws": round(float(c["ws"]), 1),
-                        "bpm": None if pd.isna(c["bpm"]) else round(float(c["bpm"]), 1), "line": _line(c)})
+                        "bpm": None if pd.isna(c.get("bpm")) else round(float(c["bpm"]), 1),
+                        "ws_per_40": None if pd.isna(c.get("ws_per_40")) else round(float(c["ws_per_40"]), 3), "line": _line(c)})
         pct = {k: (None if pd.isna(v) else round(float((car[k] < v).mean()), 3)) for k, v in proj.iloc[i].items()}
         out.append({"college": comps, "style": sty, "rate": rate,
                     "proj": {k: (None if pd.isna(v) else round(float(v), 3)) for k, v in proj.iloc[i].items()}, "proj_pct": pct})

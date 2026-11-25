@@ -24,6 +24,14 @@ TEAM_FEATS = (
 def conferences(seasons) -> pd.DataFrame:
     from . import espn_fallback as espn_season
     from . import history
+    from .config import WOMENS
+    if WOMENS:  # ESPN standings (built in womens_data); no T-Rank ratings, so no de-leak is needed or applied
+        f = PROC / "conf.parquet"
+        if f.exists():
+            c = pd.read_parquet(f)
+            return c[c["season"].isin(list(seasons))].reset_index(drop=True)
+        from .womens_data import conferences as wconf
+        return wconf(seasons)
 
     frames = []
     hist = pd.read_parquet(history.path("conf")) if history.path("conf").exists() else None
