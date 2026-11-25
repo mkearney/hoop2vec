@@ -67,7 +67,7 @@ def utcnow() -> str:
 
 
 # ------------------------------------------------------------------------ stages
-def stage_data(refresh=True):
+def stage_data(refresh=True, refit=False):
     from . import espn_fallback, history
     from . import lines as L
     from .config import ESPN_DATA
@@ -83,7 +83,7 @@ def stage_data(refresh=True):
             log("play-by-play + box scores (current season, ESPN)")
             ingest_season(cur)
         log("games, players and conferences (ESPN)")
-        out = espn_data.build(refresh=refresh)
+        out = espn_data.build(refresh=refresh, refit_box=refit)
         lines = L.collect()
         if len(lines):
             L.save(lines)
@@ -487,6 +487,27 @@ def _espn_box(season, st) -> pd.DataFrame:
         **{c: (c, "sum") for c in ("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga",
                                    "tpm", "tpa", "ftm", "fta")}).reset_index()
     agg["nk"] = agg["name"].map(norm_name)
+    # advanced rates from the box scores (the ESPN-only leagues have no Torvik tables): team and opponent totals
+    tg = b.groupby(["game_id", "team"])[["min", "fgm", "fga", "tpa", "fta", "tov", "oreb", "dreb"]].sum().reset_index()
+    op = tg.merge(tg, on="game_id", suffixes=("", "_o"))
+    op = op[op["team"] != op["team_o"]]
+    op["poss_o"] = op["fga_o"] - op["oreb_o"] + op["tov_o"] + 0.44 * op["fta_o"]
+    T = op.groupby("team").agg(Tmin=("min", "sum"), Tfgm=("fgm", "sum"), Tfga=("fga", "sum"), Tfta=("fta", "sum"),
+                               Ttov=("tov", "sum"), Torb=("oreb", "sum"), Tdrb=("dreb", "sum"), Oorb=("oreb_o", "sum"),
+                               Odrb=("dreb_o", "sum"), Ofga=("fga_o", "sum"), Otpa=("tpa_o", "sum"), Oposs=("poss_o", "sum"))
+    a = agg.join(T, on="team")
+    f = a["min"] / (a["Tmin"] / 5).clip(lower=1)           # share of the team's minutes
+    used = a["fga"] + 0.44 * a["fta"] + a["tov"]
+    pos = lambda x: x.where(x > 0)  # noqa: E731
+    agg["usg"] = 100 * used / pos(f * (a["Tfga"] + 0.44 * a["Tfta"] + a["Ttov"]))
+    agg["ts"] = 100 * a["pts"] / pos(2 * (a["fga"] + 0.44 * a["fta"]))
+    agg["efg"] = 100 * (a["fgm"] + 0.5 * a["tpm"]) / pos(a["fga"])
+    agg["ast_pct"] = 100 * a["ast"] / pos(f * a["Tfgm"] - a["fgm"])
+    agg["to_pct"] = 100 * a["tov"] / pos(used)
+    agg["orb_pct"] = 100 * a["oreb"] / pos(f * (a["Torb"] + a["Odrb"]))
+    agg["drb_pct"] = 100 * a["dreb"] / pos(f * (a["Tdrb"] + a["Oorb"]))
+    agg["blk_pct"] = 100 * a["blk"] / pos(f * (a["Ofga"] - a["Otpa"]))
+    agg["stl_pct"] = 100 * a["stl"] / pos(f * a["Oposs"])
     return agg
 
 
@@ -541,6 +562,9 @@ def write_players(st, live, pg, inj_report, season):
                           "fg_pct": 100 * b.fgm / b.fga if b.fga else None, "tp_pct": 100 * b.tpm / b.tpa if b.tpa else None,
                           "ft_pct": 100 * b.ftm / b.fta if b.fta else None,
                           "ts_box": 100 * b.pts / (2 * (b.fga + 0.44 * b.fta)) if (b.fga + b.fta) else None})
+                for c in ("usg", "ts", "efg", "ast_pct", "to_pct", "orb_pct", "drb_pct", "blk_pct", "stl_pct"):
+                    if r.get(c) is None:  # ESPN-only leagues: rates from the box scores
+                        r[c] = num(float(getattr(b, c))) if pd.notna(getattr(b, c)) else None
             rows.append(r)
     df = pd.DataFrame(rows)
     for c in ("value", "impact"):
@@ -669,7 +693,7 @@ def run(mode="daily"):
         stage_publish(*load_cached())
         log(f"finished in {time.time() - t0:.0f}s")
         return
-    games, meta, pg, ps, conf = stage_data(refresh=mode != "offline")
+    games, meta, pg, ps, conf = stage_data(refresh=mode != "offline", refit=mode == "all")
     feat, snaps, live, extras, inj = stage_features(games, meta, pg, ps, conf)
     if mode in ("train", "all") or not NET_PATH.exists() or not (ARTIFACTS / "linear.pkl").exists():
         stage_train(feat)

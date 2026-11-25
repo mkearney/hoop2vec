@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>hoop2vec: College Basketball Ratings and Forecasts</title>
+  <title>hoop2vec: Basketball Ratings and Forecasts</title>
   <meta name="description" content="Daily ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, plus the 2027 NCAA tournaments and pro playoff odds. Built on free public data.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,40 +16,38 @@
     <div class="top-right" style="margin-left:auto"><button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle dark mode"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button></div></div></header>
   <main class="wrap">
     <section class="choose-hero">
-      <h1>College basketball ratings and forecasts</h1>
+      <h1>Basketball ratings and forecasts</h1>
       <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">
-      <h2 class="choices-head">College</h2>
-      <a class="choice card" href="mens/" data-league="mens">
-        <span class="kind">Men's college basketball</span>
-        <span class="big">Men's</span>
-        <span class="muted small">Ratings, players, NBA prospects, game forecasts, the 2027 bracket and team styles.</span>
+      <div class="group"><h2 class="choices-head">College</h2><div class="group-cards">
+        <a class="choice card" href="mens/" data-league="mens">
+          <span class="big">Men's</span>
+        <span class="muted small">Ratings, players, NBA prospects, forecasts and the 2027 bracket.</span>
         <span class="top5" id="top-mens"></span>
         <span class="go">Open men's →</span>
       </a>
-      <a class="choice card" href="womens/" data-league="womens">
-        <span class="kind">Women's college basketball</span>
-        <span class="big">Women's</span>
-        <span class="muted small">Ratings, players, WNBA prospects, game forecasts, the 2027 bracket and team styles.</span>
+        <a class="choice card" href="womens/" data-league="womens">
+          <span class="big">Women's</span>
+        <span class="muted small">Ratings, players, WNBA prospects, forecasts and the 2027 bracket.</span>
         <span class="top5" id="top-womens"></span>
         <span class="go">Open women's →</span>
       </a>
-      <h2 class="choices-head">Pro</h2>
-      <a class="choice card" href="nba/" data-league="nba">
-        <span class="kind">Pro basketball</span>
-        <span class="big">NBA</span>
-        <span class="muted small">Ratings, players, playoff odds with the play-in, game forecasts and team styles.</span>
+      </div></div>
+      <div class="group"><h2 class="choices-head">Pro</h2><div class="group-cards">
+        <a class="choice card" href="nba/" data-league="nba">
+          <span class="big">NBA</span>
+        <span class="muted small">Ratings, players, forecasts and playoff odds with the play-in.</span>
         <span class="top5" id="top-nba"></span>
         <span class="go">Open NBA →</span>
       </a>
-      <a class="choice card" href="wnba/" data-league="wnba">
-        <span class="kind">Pro basketball</span>
-        <span class="big">WNBA</span>
-        <span class="muted small">Ratings, players, playoff odds, game forecasts and team styles.</span>
+        <a class="choice card" href="wnba/" data-league="wnba">
+          <span class="big">WNBA</span>
+        <span class="muted small">Ratings, players, forecasts and playoff odds.</span>
         <span class="top5" id="top-wnba"></span>
         <span class="go">Open WNBA →</span>
       </a>
+      </div></div>
     </section>
   </main>
   <footer class="wrap footer"><span>hoop2vec · free public data only</span><a href="https://github.com/mkearney/hoop2vec">source</a></footer>

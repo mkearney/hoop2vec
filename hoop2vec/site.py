@@ -31,13 +31,13 @@ THEME_BTN = ('<button class="icon-btn" id="theme" title="Toggle theme" aria-labe
 LEAGUES = {
     "mens": {"name": "Men's", "full": "men's college basketball", "pro": "NBA",
              "src": "barttorvik.com, ESPN, Basketball-Reference, Covers, Rotowire",
-             "blurb": "Ratings, players, NBA prospects, game forecasts, the 2027 bracket and team styles."},
+             "blurb": "Ratings, players, NBA prospects, forecasts and the 2027 bracket."},
     "womens": {"name": "Women's", "full": "women's college basketball", "pro": "WNBA", "src": "ESPN, Basketball-Reference",
-               "blurb": "Ratings, players, WNBA prospects, game forecasts, the 2027 bracket and team styles."},
+               "blurb": "Ratings, players, WNBA prospects, forecasts and the 2027 bracket."},
     "nba": {"name": "NBA", "full": "the NBA", "src": "ESPN",
-            "blurb": "Ratings, players, playoff odds with the play-in, game forecasts and team styles."},
+            "blurb": "Ratings, players, forecasts and playoff odds with the play-in."},
     "wnba": {"name": "WNBA", "full": "the WNBA", "src": "ESPN",
-             "blurb": "Ratings, players, playoff odds, game forecasts and team styles."},
+             "blurb": "Ratings, players, forecasts and playoff odds."},
 }
 PRO_LEAGUES = ("nba", "wnba")
 NAV = [("ratings", "Ratings"), ("players", "Players"), ("prospects", "Prospects"), ("bracket", "Bracket"),
@@ -93,25 +93,24 @@ def league_page(league: str) -> str:
 def chooser_page() -> str:
     def card(lg):
         L = LEAGUES[lg]
-        kind = "Pro basketball" if lg in PRO_LEAGUES else f"{L['name']} college basketball"
         return f'''
-      <a class="choice card" href="{lg}/" data-league="{lg}">
-        <span class="kind">{kind}</span>
-        <span class="big">{L['name']}</span>
+        <a class="choice card" href="{lg}/" data-league="{lg}">
+          <span class="big">{L['name']}</span>
         <span class="muted small">{L['blurb']}</span>
         <span class="top5" id="top-{lg}"></span>
         <span class="go">Open {L['name'] if lg in PRO_LEAGUES else L['name'].lower()} →</span>
       </a>'''
-    cards = ('\n      <h2 class="choices-head">College</h2>' + "".join(card(lg) for lg in ("mens", "womens"))
-             + '\n      <h2 class="choices-head">Pro</h2>' + "".join(card(lg) for lg in PRO_LEAGUES))
-    return HEAD.format(title="hoop2vec: College Basketball Ratings and Forecasts",
+    group = lambda title, lgs: (f'\n      <div class="group"><h2 class="choices-head">{title}</h2><div class="group-cards">'
+                                + "".join(card(lg) for lg in lgs) + "\n      </div></div>")
+    cards = group("College", ("mens", "womens")) + group("Pro", PRO_LEAGUES)
+    return HEAD.format(title="hoop2vec: Basketball Ratings and Forecasts",
                        desc="Daily ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, plus the 2027 NCAA tournaments and pro playoff odds. Built on free public data.",
                        css="assets/style.css", icon=ICON) + f'''<body class="chooser">
   <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./">{BALL}<span>hoop2vec</span></a>
     <div class="top-right" style="margin-left:auto">{THEME_BTN}</div></div></header>
   <main class="wrap">
     <section class="choose-hero">
-      <h1>College basketball ratings and forecasts</h1>
+      <h1>Basketball ratings and forecasts</h1>
       <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">{cards}

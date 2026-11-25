@@ -199,32 +199,48 @@ works differently:
 | Series, log loss | NBA (224 series, 2012–2026) | WNBA (97 series, 2012–2025) |
 |---|---|---|
 | Home-court team wins at its historical rate | 0.598 | 0.591 |
-| hoop2vec blend | 0.558 | 0.569 |
-| Linear game model | 0.557 | 0.576 |
-| Adjusted efficiency | **0.555** | 0.566 |
-| Elo | 0.581 | **0.557** |
+| hoop2vec blend | **0.566** | 0.560 |
+| Linear game model | 0.573 | 0.568 |
+| Adjusted efficiency | 0.578 | **0.555** |
+| Elo | 0.581 | 0.557 |
 
 **Game model.** Season-ahead backtest, log loss:
 
 | | NBA, all games (19,186) | NBA playoffs (1,258) | NBA, DraftKings lines (1,071) | WNBA, all games (3,203) | WNBA playoffs (260) |
 |---|---|---|---|---|---|
-| **hoop2vec blend** | **0.6117** | 0.6361 | 0.5960 | 0.6160 | 0.6228 |
-| Matchup network | 0.6118 | 0.6386 | 0.5952 | 0.6212 | 0.6256 |
-| Linear game model | 0.6163 | 0.6348 | 0.6041 | 0.6155 | 0.6216 |
-| Adjusted efficiency | 0.6176 | **0.6346** | 0.6054 | **0.6152** | **0.6207** |
-| Elo | 0.6174 | 0.6444 | 0.6082 | 0.6190 | 0.6217 |
+| **hoop2vec blend** | **0.6096** | 0.6347 | 0.5979 | 0.6133 | 0.6251 |
+| Matchup network | 0.6101 | 0.6382 | 0.5981 | 0.6187 | 0.6258 |
+| Linear game model | 0.6136 | **0.6343** | 0.6020 | 0.6132 | 0.6245 |
+| Adjusted efficiency | 0.6147 | 0.6348 | 0.6033 | **0.6126** | 0.6225 |
+| Elo | 0.6174 | 0.6444 | 0.6082 | 0.6190 | **0.6217** |
 | Sportsbook line (benchmark) | – | – | **0.5812** | – | – |
 
 Pro games are much closer than college games, so every number sits near 0.6. In the NBA the blend beats the linear
-model by 0.0046 (95% CI 0.0033–0.0060) and the network carries 80% of it; the sportsbook beats everything by about
-0.015, as a sharp market should. With 15 small WNBA seasons the models are within noise of each other and the
-backtest puts 80% on the linear model. The Kalman settings were re-tuned on each league (`python -m hoop2vec tune`)
+model by 0.0040 (95% CI 0.0028–0.0052) and the network carries 70% of it; the sportsbook beats everything by about
+0.017, as a sharp market should. With 15 small WNBA seasons the models are within noise of each other and the
+backtest puts 70% on the linear model. Switching player values to RAPM improved NBA games (0.6117 to 0.6096) and
+WNBA games (0.6160 to 0.6133); NBA series got slightly worse (0.558 to 0.566, within noise for 224 series). The Kalman settings were re-tuned on each league (`python -m hoop2vec tune`)
 and kept only if they did better on the three most recent seasons; the college defaults held up in both.
 
-**Players and styles.** Player values are the same ESPN-built box plus/minus as the women's college site (per-48
-in the NBA), with a newcomer prior fitted from past first-season players. Identity models are fitted on each
-league's play-by-play (570 NBA and 220 WNBA team-seasons), with fewer archetypes than college (6/5/5 and 4/4/4) and
-names carried over from the men's model where the dimensions match, then edited by hand.
+**Players.** The team-level box plus/minus the women's college site uses has the old PER bias in the pros:
+efficient low-usage centers (Robert Williams III, Mitchell Robinson, Luke Kornet) came out as the NBA's best
+players, because a team's rebounds and blocks were credited to whoever recorded them. The pro sites measure impact
+from lineups instead (`hoop2vec/rapm.py`): **RAPM**, a ridge regression of every lineup stint's opponent-adjusted
+offense and defense on the five players on the floor, over rolling three-season windows. A box-score model is then
+fitted to RAPM (the way BPM is built) and applied to each game line, with a team adjustment so the team's
+minute-weighted total matches its opponent-adjusted result. The NBA's top players by value are now Wembanyama,
+Curry, Gilgeous-Alexander, Doncic and Jokic; those three centers rank 88th, 146th and 172nd. The box model explains
+49% of offensive RAPM and 15% of defensive (defense is mostly invisible in a box score). It also improved the game
+models (below).
+
+**Availability.** Before a game, players' chances of playing come from recent missed games. College players who miss
+a game are usually hurt; pros rest. Measured on 2008-2026 regulars: after missing 1, 2 or 3+ games an NBA player
+plays the next one 55%, 36% and 12% of the time, but in the first playoff game 91%, 84% and 76% (end-of-season
+rest). Those league-specific rates replace the college ones, so a rested star no longer reads as out for a series.
+
+**Styles.** Identity models are fitted on each league's play-by-play (570 NBA and 220 WNBA team-seasons), with fewer
+archetypes than college (6/5/5 and 4/4/4) and names carried over from the men's model where the dimensions match,
+then edited by hand.
 
 ## Usage
 

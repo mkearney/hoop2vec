@@ -373,7 +373,7 @@ def _height_neutralize(pb: pd.DataFrame) -> dict:
     return out
 
 
-def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame) -> pd.DataFrame:
+def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame, refit_box: bool = False) -> pd.DataFrame:
     """Per player-game box plus/minus (obpm/dbpm/bpm), Torvik's units: a team's 5 x minute-weighted mean = its
     opponent-adjusted game margin per 100 possessions."""
     seasons = sorted(games["season"].unique())
@@ -413,7 +413,11 @@ def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame) -> pd
     exp_now = pb["athlete_id"].map(ath["exp"])
     pb["cls"] = cls_label(exp_now - (last - pb["season"]))
     pb["inches"] = pb["athlete_id"].map(ath["height"])
-    gam = _height_neutralize(pb)
+    if PRO_LEAGUE:  # box model fitted to lineup RAPM (rapm.py) instead of the team-level fit + height correction
+        _rapm_values(pb, games, kpre, d, refit_box)
+        gam = None
+    else:
+        gam = _height_neutralize(pb)
     cj = json.loads((ARTIFACTS / "box_value_coef.json").read_text())
     cj["height_shift_per_inch"] = gam
     (ARTIFACTS / "box_value_coef.json").write_text(json.dumps(cj, indent=1))
@@ -425,6 +429,29 @@ def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame) -> pd
             "bpm", "obpm", "dbpm", "pts", "poss", "pos"] + BOX[:-1] + ["twopm", "twopa"]
     keep = list(dict.fromkeys(c for c in keep if c in pb.columns))
     return pb[keep]
+
+
+def _rapm_values(pb: pd.DataFrame, games, kpre, d, refit: bool):
+    """Pro leagues: game values from the RAPM-fitted box model, then a team adjustment so the team's minute-weighted
+    total equals its opponent-adjusted result in the game (offense and defense separately). In place."""
+    from . import rapm as RP
+    g = games.set_index(["season", "gid"])["poss"]
+    on = (pb["p_on_off_poss"].fillna(0) + pb["p_on_def_poss"].fillna(0)) / 2
+    est = pb["min"] / GAME_MINUTES * pd.Series(list(zip(pb["season"], pb["muid"]))).map(g).to_numpy()
+    pb["on_poss"] = np.where(on > 0, on, est)
+    if refit or not RP.COEF_PATH.exists():
+        print("  fitting RAPM windows and the box model on top (a few minutes)", flush=True)
+        RP.build(games, kpre, pb, d)
+    coef = json.loads(RP.COEF_PATH.read_text())
+    rates = pb[RP.BOX].div(pb["on_poss"].clip(lower=1), axis=0) * 100
+    rates.columns = [f"r_{c}" for c in RP.BOX]
+    rates["inches"] = pb["inches"]
+    v = RP.predict_box(rates, coef)
+    key = [pb["season"], pb["muid"], pb["team"]]
+    for k, y, col in (("o", "y_o", "obpm"), ("d", "y_d", "dbpm")):
+        adj = pb[y] / 5.0 - (v[k] * pb["w"]).groupby(key).transform("sum")
+        pb[col] = v[k] + adj
+    pb["bpm"] = pb["obpm"] + pb["dbpm"]
 
 
 def player_seasons(pg: pd.DataFrame, conf: pd.DataFrame) -> pd.DataFrame:
@@ -451,8 +478,8 @@ def player_seasons(pg: pd.DataFrame, conf: pd.DataFrame) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------ entry
-def build(refresh: bool = True):
-    """games, meta, pg, ps, conf for the women's game (writes PROC files the shared loaders read)."""
+def build(refresh: bool = True, refit_box: bool = False):
+    """games, meta, pg, ps, conf (writes PROC files the shared loaders read). ``refit_box``: pros, refit RAPM."""
     from . import games as D
     from .ratings import kalman as KAL
     cur = current_season()
@@ -470,7 +497,7 @@ def build(refresh: bool = True):
     pb = _player_box(seasons, d)
     cont = KAL.continuity(pb.assign(pid=pd.to_numeric(pb["athlete_id"], errors="coerce")))
     kpre, _ = KAL.pregame(g[g["type"] != "nond1"], cont)
-    pg = player_games(g[g["type"] != "nond1"], d, kpre)
+    pg = player_games(g[g["type"] != "nond1"], d, kpre, refit_box=refit_box)
     for s, x in pg.groupby("season"):
         x.astype({"cls": "string", "loc": "string"}).to_parquet(PROC / f"pg_{s}.parquet")
     ps = player_seasons(pg, conf)

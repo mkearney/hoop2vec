@@ -378,22 +378,23 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .leagues a { font-size: 12.5px; font-weight: 600; color: var(--text-2); padding: 4px 9px; border-radius: 7px; white-space: nowrap; }
 .leagues a:hover { text-decoration: none; color: var(--text); }
 .leagues a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
-.choices-head { grid-column: 1 / -1; font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--text-3); margin: 10px 0 -6px; }
 .chooser main { min-height: calc(100vh - 140px); }
 .choose-hero { text-align: center; max-width: 760px; margin: 56px auto 32px; }
 .choose-hero h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -.02em; margin: 0 0 12px; }
 .choose-hero .sub { color: var(--text-2); font-size: 16px; line-height: 1.55; margin: 0; }
-.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 880px; margin: 0 auto 56px; }
-.choice { display: flex; flex-direction: column; gap: 10px; padding: 26px 26px 22px; color: var(--text); border: 1px solid var(--border);
+.choices { display: grid; grid-template-columns: 1fr; gap: 28px; max-width: 1180px; margin: 0 auto 56px; }
+.group-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.choices-head { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin: 0 0 10px; }
+.choice { display: flex; flex-direction: column; gap: 10px; padding: 22px 22px 20px; color: var(--text); border: 1px solid var(--border);
   transition: border-color .15s, transform .15s, box-shadow .15s; }
 .choice:hover { text-decoration: none; border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, .08); }
-.choice .kind { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
-.choice .big { font-size: 40px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
-.choice .top5 { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; min-height: 120px; margin-top: 4px; }
+.choice .big { font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
+.choice .muted.small { min-height: 2.9em; line-height: 1.45; }
+.choice .top5 { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; min-height: 128px; }
 .choice .top5 b { font-size: 12px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-.choice .top5 .row { display: flex; align-items: center; gap: 8px; }
+.choice .top5 .row { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .choice .top5 .logo { width: 18px; height: 18px; }
 .choice .go { margin-top: auto; font-weight: 650; color: var(--accent); }
+@media (min-width: 1080px) { .choices { grid-template-columns: 1fr 1fr; } .choice .muted.small { min-height: 4.35em; } }
 @media (max-width: 860px) { .leagues a { padding: 4px 7px; font-size: 12px; } }
-@media (max-width: 640px) { .choices { grid-template-columns: 1fr; } .choose-hero { margin-top: 32px; } }
+@media (max-width: 640px) { .group-cards { grid-template-columns: 1fr; } .choose-hero { margin-top: 32px; } .choice .muted.small, .choice .top5 { min-height: 0; } }

@@ -165,8 +165,8 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
     live = {}
     g = games[games["type"] != "nond1"]
     long = pd.concat([
-        g[["season", "date", "gid", "team_a", "played", "minutes"]].rename(columns={"team_a": "team"}),
-        g[["season", "date", "gid", "team_b", "played", "minutes"]].rename(columns={"team_b": "team"}),
+        g[["season", "date", "gid", "team_a", "played", "minutes", "type"]].rename(columns={"team_a": "team"}),
+        g[["season", "date", "gid", "team_b", "played", "minutes", "type"]].rename(columns={"team_b": "team"}),
     ])
     long["minutes"] = long["minutes"].fillna(5 * GAME_MINUTES)
     pgi = pg[pg["min"] > 0]
@@ -248,7 +248,8 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         delta = ((A - part) * SP * (V - V_REPL)).sum(1)
         delta[0] = 0.0
         # pre-game knowable availability (recent missed games only) for honest backtests
-        Apre = _heuristic_avail_matrix(P)
+        is_post = played["type"].isin(["post", "conftourney"]).to_numpy()
+        Apre = _heuristic_avail_matrix(P, int(np.argmax(is_post)) if is_post.any() else None)
         delta_pre = ((Apre - part) * SP * (V - V_REPL)).sum(1)
         delta_pre[0] = 0.0
         delta_pre[n] = delta[n]
@@ -376,16 +377,34 @@ def deleak_bpm(pg: pd.DataFrame, games: pd.DataFrame, kpre: pd.DataFrame, conf: 
     return pg
 
 
-def _heuristic_avail_matrix(P: np.ndarray) -> np.ndarray:
-    """Row j = expected availability for game j using games < j only (rows 0..n)."""
+# P(plays the next game) for a regular who missed the last 1, 2, 3+ games. College: a missed game is usually an
+# injury. Pros rest a lot (back-to-backs, the end of the season), measured on 2008-2026 regulars: NBA 55% / 36% /
+# 12%, WNBA 49% / 34% / 12%. In the first postseason game, players who sat the last regular-season games almost
+# always return: NBA 91% / 84% / 76%, WNBA 85% / 76% / 63%.
+AVAIL_AFTER_MISSES = {"mens": (0.65, 0.3, 0.05), "womens": (0.65, 0.3, 0.05),
+                      "nba": (0.55, 0.36, 0.12), "wnba": (0.49, 0.34, 0.12)}
+AVAIL_FIRST_POST = {"nba": (0.91, 0.84, 0.76), "wnba": (0.85, 0.76, 0.63)}
+
+
+def _miss_probs(first_post: bool = False):
+    from .config import LEAGUE
+    if first_post and LEAGUE in AVAIL_FIRST_POST:
+        return AVAIL_FIRST_POST[LEAGUE]
+    return AVAIL_AFTER_MISSES.get(LEAGUE, AVAIL_AFTER_MISSES["mens"])
+
+
+def _heuristic_avail_matrix(P: np.ndarray, first_post: int | None = None) -> np.ndarray:
+    """Row j = expected availability for game j using games < j only (rows 0..n). ``first_post``: index of the
+    team's first postseason game (pros), where end-of-season rest no longer predicts absence."""
     n, k = P.shape
     A = np.ones((n + 1, k))
     ever = np.vstack([np.zeros((1, k)), np.cumsum(P, 0)]) > 0
     for j in range(n + 1):
+        p1, p2, p3 = _miss_probs(j == first_post)
         l1 = P[j - 1] if j >= 1 else np.ones(k)
         l2 = P[j - 2] if j >= 2 else np.ones(k)
         l3 = P[j - 3] if j >= 3 else np.ones(k)
-        a = np.where(l1 > 0, 1.0, np.where(l2 > 0, 0.65, np.where(l3 > 0, 0.3, 0.05)))
+        a = np.where(l1 > 0, 1.0, np.where(l2 > 0, p1, np.where(l3 > 0, p2, p3)))
         A[j] = np.where(ever[j], a, 0.0)
     return A
 
@@ -400,11 +419,12 @@ def _default_avail(P: np.ndarray, i: int) -> float:
     played_ever = P[:, i].any()
     if not played_ever:
         return 0.0
+    p1, p2, p3 = _miss_probs()
     last = P[-3:, i]
     if len(last) >= 3 and last.sum() == 0:
-        return 0.05  # missed 3 straight: almost surely out
+        return p3  # missed 3 straight: probably out
     if len(last) >= 2 and last[-2:].sum() == 0:
-        return 0.3
+        return p2
     if last[-1] == 0:
-        return 0.65
+        return p1
     return 1.0
