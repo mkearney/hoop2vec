@@ -25,7 +25,7 @@ FIRST_TRAIN_SEASON = 2009
 
 USER_AGENT = os.environ.get("HOOP2VEC_UA", "hoop2vec-research/1.0 (non-commercial academic research)")
 # minimum seconds between requests to a host (barttorvik.com asks for a 10s crawl delay)
-HOST_MIN_INTERVAL = {"barttorvik.com": 10.0}
+HOST_MIN_INTERVAL = {"barttorvik.com": 10.0, "basketball-reference.com": 6.0}  # robots: 10s, 3s crawl delays
 
 
 def today() -> dt.date:

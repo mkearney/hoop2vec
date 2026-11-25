@@ -20,7 +20,8 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
 | **Final game model** | both | Margin blend of the two, weight chosen by the backtest |
 | Team identities: factor analysis + archetypes + identity cards | mmkm | Descriptive; style adds ~nothing to March predictions |
 | Bracket: exact advancement odds, 76-team format, pods, actual bracket from ESPN | mmai + mmkm | Pool-optimal and most-likely picks with expected points |
-| Front end | both | Ratings, Players, team pages, Matchup Lab, Games, Bracket, Styles, Method |
+| NBA prospects: draft model + NBA success model | new | Torvik player tables (incl. draft pick, birthdate) + Basketball-Reference careers |
+| Front end | both | Ratings, Players, Prospects, team pages, Matchup Lab, Games, Bracket, Styles, Method |
 
 ## What changed in the merge
 
@@ -48,6 +49,36 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
   plus/minus (points per 100 possessions vs an average D-I player). **Impact** = minutes share × (value −
   replacement), i.e. what he adds to his team's rating. Each player also gets availability, ESPN per-game box stats
   and Torvik's advanced rates. The site defaults to rotation players (3+ games, 15+ mpg) and can show everyone.
+
+## NBA prospects
+
+Two models on every D-I player-season since 2008 (`hoop2vec/prospects.py`, `docs/data/prospects.json`):
+
+* **Draft model:** gradient-boosted classifiers give P(picked in the top 5 / 14 / 30 / 60 this June). The college
+  board orders players by them. Labels come from barttorvik.com's draft-pick field, counted on a player's final
+  college season.
+* **NBA success model:** regularized logistic and Poisson models give P(8+ Win Shares in the first 4 NBA seasons),
+  P(20+, a "star start") and expected 4-year Win Shares. Outcomes come from basketball-reference.com season
+  tables (one page per season, allowed by robots.txt and fetched slowly), matched to college players by name,
+  timing and age. Undrafted players and players who never reach the NBA count too.
+* **Features:** age on draft day, height, class, recruiting, team and conference strength, role, and about 30
+  opponent-aware rates (BPM, PORPAG, usage, shooting, rim and 3-point profile, assist, turnover, rebound, block and
+  steal rates). The current season is shrunk toward last season and the population, the same way in training.
+  Each prospect also gets three statistical comps.
+
+Forward-chained backtest by draft year (each draft or class predicted by a model trained only on earlier ones):
+
+| | Model | Recruiting + BPM + age baseline | Actual draft slot |
+|---|---|---|---|
+| Who gets drafted, 2012–2026 (AUC) | **0.988** | 0.969 | – |
+| Actual draftees in the model's top 30 (avg per draft) | **20.4** | 14.7 | – |
+| Draft order of picked players (Spearman) | **0.53** | 0.48 | – |
+| NBA success, all players 2012–2022 (log loss) | **0.0301** | 0.0322 | – |
+| NBA success, drafted players (AUC) | 0.741 | 0.738 | **0.773** |
+
+NBA teams' draft position remains the better predictor of NBA success (they see workouts, medicals and context),
+and adding the model to the slot didn't beat the slot alone. College players only: international and G League
+prospects aren't modeled.
 
 ## Backtest
 

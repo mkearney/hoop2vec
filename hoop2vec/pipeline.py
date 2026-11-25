@@ -314,6 +314,8 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     log("bracket")
     write_json("bracket.json", make_bracket(bundle, st, power, games, meta, season))
 
+    stage_prospects()
+
     from . import espn_fallback
     source = "espn" if espn_fallback.active(season) else "torvik"
     write_json("meta.json", {
@@ -324,6 +326,21 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
         "season_accuracy": acc,
     })
     log("publish done")
+
+
+def stage_prospects(refresh=False, backtest=False):
+    """NBA prospect models (draft order + NBA success) -> prospects.json. Optional: rerun their backtest."""
+    from . import prospects as PRO
+    try:
+        log("NBA prospects")
+        T, *_ = PRO.build_table(refresh_current=refresh)
+        if backtest or not PRO.BT_PATH.exists():
+            log("  prospect backtest (forward-chained by draft year)")
+            PRO.run_backtest(T)
+        out = PRO.publish(T, write_json)
+        log(f"  {len(out['players']) if out else 0} prospects on the board")
+    except Exception as e:  # never block the rest of the site
+        log(f"  prospects skipped: {e!r}")
 
 
 def season_tracking(feat, season, bundle):
@@ -610,6 +627,8 @@ def run(mode="daily"):
         stage_train(feat)
     if mode in ("backtest", "all"):
         stage_backtest(feat)
+        from . import prospects as PRO
+        PRO.run_backtest(PRO.build_table()[0])
     if not (feat["season"].eq(current_season()) & feat["played"]).any():
         log("no games played yet this season - keeping last published site")
         return

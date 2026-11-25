@@ -1,0 +1,872 @@
+{
+ "draft": {
+  "years": [
+   2012,
+   2026
+  ],
+  "n_rows": 59515,
+  "n_drafted": 714,
+  "model": {
+   "auc_drafted": 0.9876,
+   "auc_lottery": 0.9892,
+   "ll_drafted": 0.0254,
+   "spearman_pick": 0.531,
+   "top30_hits": 20.4667
+  },
+  "baseline": {
+   "auc_drafted": 0.9691,
+   "auc_lottery": 0.9881,
+   "ll_drafted": 0.0348,
+   "spearman_pick": 0.4792,
+   "top30_hits": 14.7333
+  },
+  "per_year": [
+   {
+    "year": 2012,
+    "n_drafted": 52,
+    "auc_drafted": 0.9867,
+    "auc_drafted_base": 0.9632,
+    "ll_drafted": 0.0309,
+    "ll_drafted_base": 0.0413,
+    "auc_lottery": 0.984,
+    "auc_lottery_base": 0.9885,
+    "spearman_pick": 0.469,
+    "spearman_pick_base": 0.427,
+    "top30_hits": 20,
+    "top30_hits_base": 14
+   },
+   {
+    "year": 2013,
+    "n_drafted": 46,
+    "auc_drafted": 0.9876,
+    "auc_drafted_base": 0.9742,
+    "ll_drafted": 0.0278,
+    "ll_drafted_base": 0.0327,
+    "auc_lottery": 0.9937,
+    "auc_lottery_base": 0.9825,
+    "spearman_pick": 0.4059,
+    "spearman_pick_base": 0.4181,
+    "top30_hits": 19,
+    "top30_hits_base": 16
+   },
+   {
+    "year": 2014,
+    "n_drafted": 45,
+    "auc_drafted": 0.9878,
+    "auc_drafted_base": 0.974,
+    "ll_drafted": 0.0238,
+    "ll_drafted_base": 0.0335,
+    "auc_lottery": 0.9457,
+    "auc_lottery_base": 0.9876,
+    "spearman_pick": 0.4834,
+    "spearman_pick_base": 0.4656,
+    "top30_hits": 22,
+    "top30_hits_base": 14
+   },
+   {
+    "year": 2015,
+    "n_drafted": 46,
+    "auc_drafted": 0.9876,
+    "auc_drafted_base": 0.9656,
+    "ll_drafted": 0.0247,
+    "ll_drafted_base": 0.0322,
+    "auc_lottery": 0.9972,
+    "auc_lottery_base": 0.9952,
+    "spearman_pick": 0.6618,
+    "spearman_pick_base": 0.5842,
+    "top30_hits": 21,
+    "top30_hits_base": 17
+   },
+   {
+    "year": 2016,
+    "n_drafted": 44,
+    "auc_drafted": 0.9859,
+    "auc_drafted_base": 0.9662,
+    "ll_drafted": 0.0287,
+    "ll_drafted_base": 0.0363,
+    "auc_lottery": 0.9944,
+    "auc_lottery_base": 0.9871,
+    "spearman_pick": 0.45,
+    "spearman_pick_base": 0.3517,
+    "top30_hits": 17,
+    "top30_hits_base": 9
+   },
+   {
+    "year": 2017,
+    "n_drafted": 51,
+    "auc_drafted": 0.9867,
+    "auc_drafted_base": 0.9825,
+    "ll_drafted": 0.0254,
+    "ll_drafted_base": 0.0326,
+    "auc_lottery": 0.9981,
+    "auc_lottery_base": 0.9976,
+    "spearman_pick": 0.5573,
+    "spearman_pick_base": 0.5258,
+    "top30_hits": 24,
+    "top30_hits_base": 18
+   },
+   {
+    "year": 2018,
+    "n_drafted": 51,
+    "auc_drafted": 0.9742,
+    "auc_drafted_base": 0.9626,
+    "ll_drafted": 0.0308,
+    "ll_drafted_base": 0.0379,
+    "auc_lottery": 0.994,
+    "auc_lottery_base": 0.9683,
+    "spearman_pick": 0.6226,
+    "spearman_pick_base": 0.5793,
+    "top30_hits": 18,
+    "top30_hits_base": 17
+   },
+   {
+    "year": 2019,
+    "n_drafted": 51,
+    "auc_drafted": 0.9893,
+    "auc_drafted_base": 0.961,
+    "ll_drafted": 0.0267,
+    "ll_drafted_base": 0.0402,
+    "auc_lottery": 0.9957,
+    "auc_lottery_base": 0.9864,
+    "spearman_pick": 0.5726,
+    "spearman_pick_base": 0.5168,
+    "top30_hits": 19,
+    "top30_hits_base": 14
+   },
+   {
+    "year": 2020,
+    "n_drafted": 49,
+    "auc_drafted": 0.9918,
+    "auc_drafted_base": 0.975,
+    "ll_drafted": 0.0237,
+    "ll_drafted_base": 0.0359,
+    "auc_lottery": 0.9897,
+    "auc_lottery_base": 0.9922,
+    "spearman_pick": 0.4103,
+    "spearman_pick_base": 0.4827,
+    "top30_hits": 21,
+    "top30_hits_base": 13
+   },
+   {
+    "year": 2021,
+    "n_drafted": 49,
+    "auc_drafted": 0.9883,
+    "auc_drafted_base": 0.9784,
+    "ll_drafted": 0.0263,
+    "ll_drafted_base": 0.0342,
+    "auc_lottery": 0.9877,
+    "auc_lottery_base": 0.9811,
+    "spearman_pick": 0.3538,
+    "spearman_pick_base": 0.2897,
+    "top30_hits": 21,
+    "top30_hits_base": 15
+   },
+   {
+    "year": 2022,
+    "n_drafted": 43,
+    "auc_drafted": 0.991,
+    "auc_drafted_base": 0.9721,
+    "ll_drafted": 0.0224,
+    "ll_drafted_base": 0.0285,
+    "auc_lottery": 0.9963,
+    "auc_lottery_base": 0.989,
+    "spearman_pick": 0.6207,
+    "spearman_pick_base": 0.3753,
+    "top30_hits": 19,
+    "top30_hits_base": 18
+   },
+   {
+    "year": 2023,
+    "n_drafted": 46,
+    "auc_drafted": 0.9883,
+    "auc_drafted_base": 0.9645,
+    "ll_drafted": 0.026,
+    "ll_drafted_base": 0.0363,
+    "auc_lottery": 0.9954,
+    "auc_lottery_base": 0.9958,
+    "spearman_pick": 0.4414,
+    "spearman_pick_base": 0.494,
+    "top30_hits": 19,
+    "top30_hits_base": 12
+   },
+   {
+    "year": 2024,
+    "n_drafted": 43,
+    "auc_drafted": 0.9869,
+    "auc_drafted_base": 0.961,
+    "ll_drafted": 0.0228,
+    "ll_drafted_base": 0.0339,
+    "auc_lottery": 0.9951,
+    "auc_lottery_base": 0.9932,
+    "spearman_pick": 0.5501,
+    "spearman_pick_base": 0.3759,
+    "top30_hits": 21,
+    "top30_hits_base": 12
+   },
+   {
+    "year": 2025,
+    "n_drafted": 45,
+    "auc_drafted": 0.9903,
+    "auc_drafted_base": 0.9621,
+    "ll_drafted": 0.0217,
+    "ll_drafted_base": 0.0359,
+    "auc_lottery": 0.9884,
+    "auc_lottery_base": 0.9865,
+    "spearman_pick": 0.6302,
+    "spearman_pick_base": 0.6208,
+    "top30_hits": 21,
+    "top30_hits_base": 13
+   },
+   {
+    "year": 2026,
+    "n_drafted": 53,
+    "auc_drafted": 0.9933,
+    "auc_drafted_base": 0.9763,
+    "ll_drafted": 0.021,
+    "ll_drafted_base": 0.0313,
+    "auc_lottery": 0.9992,
+    "auc_lottery_base": 0.9965,
+    "spearman_pick": 0.8457,
+    "spearman_pick_base": 0.6424,
+    "top30_hits": 25,
+    "top30_hits_base": 19
+   }
+  ],
+  "last_draft": {
+   "year": 2026,
+   "board": [
+    {
+     "rank": 1,
+     "name": "Cameron Boozer",
+     "team": "Duke",
+     "p30": 0.963,
+     "pick": 3
+    },
+    {
+     "rank": 2,
+     "name": "AJ Dybantsa",
+     "team": "BYU",
+     "p30": 0.936,
+     "pick": 1
+    },
+    {
+     "rank": 3,
+     "name": "Kingston Flemings",
+     "team": "Houston",
+     "p30": 0.911,
+     "pick": 8
+    },
+    {
+     "rank": 4,
+     "name": "Darius Acuff Jr.",
+     "team": "Arkansas",
+     "p30": 0.942,
+     "pick": 7
+    },
+    {
+     "rank": 5,
+     "name": "Nate Ament",
+     "team": "Tennessee",
+     "p30": 0.839,
+     "pick": 13
+    },
+    {
+     "rank": 6,
+     "name": "Caleb Wilson",
+     "team": "North Carolina",
+     "p30": 0.816,
+     "pick": 4
+    },
+    {
+     "rank": 7,
+     "name": "Darryn Peterson",
+     "team": "Kansas",
+     "p30": 0.814,
+     "pick": 2
+    },
+    {
+     "rank": 8,
+     "name": "Brayden Burries",
+     "team": "Arizona",
+     "p30": 0.831,
+     "pick": 10
+    },
+    {
+     "rank": 9,
+     "name": "Koa Peat",
+     "team": "Arizona",
+     "p30": 0.823,
+     "pick": 30
+    },
+    {
+     "rank": 10,
+     "name": "Hannes Steinbach",
+     "team": "Washington",
+     "p30": 0.846,
+     "pick": 14
+    },
+    {
+     "rank": 11,
+     "name": "Mikel Brown Jr.",
+     "team": "Louisville",
+     "p30": 0.888,
+     "pick": 6
+    },
+    {
+     "rank": 12,
+     "name": "Christian Anderson",
+     "team": "Texas Tech",
+     "p30": 0.902,
+     "pick": 18
+    },
+    {
+     "rank": 13,
+     "name": "Keaton Wagler",
+     "team": "Illinois",
+     "p30": 0.743,
+     "pick": 5
+    },
+    {
+     "rank": 14,
+     "name": "Cameron Carr",
+     "team": "Baylor",
+     "p30": 0.806,
+     "pick": 24
+    },
+    {
+     "rank": 15,
+     "name": "Tounde Yessoufou",
+     "team": "Baylor",
+     "p30": 0.808,
+     "pick": null
+    },
+    {
+     "rank": 16,
+     "name": "Labaron Philon",
+     "team": "Alabama",
+     "p30": 0.734,
+     "pick": 22
+    },
+    {
+     "rank": 17,
+     "name": "Ebuka Okorie",
+     "team": "Stanford",
+     "p30": 0.562,
+     "pick": 17
+    },
+    {
+     "rank": 18,
+     "name": "Chris Cenac Jr",
+     "team": "Houston",
+     "p30": 0.711,
+     "pick": 27
+    },
+    {
+     "rank": 19,
+     "name": "JT Toppin",
+     "team": "Texas Tech",
+     "p30": 0.602,
+     "pick": null
+    },
+    {
+     "rank": 20,
+     "name": "Zuby Ejiofor",
+     "team": "St. John's",
+     "p30": 0.645,
+     "pick": 23
+    },
+    {
+     "rank": 21,
+     "name": "Meleek Thomas",
+     "team": "Arkansas",
+     "p30": 0.733,
+     "pick": 34
+    },
+    {
+     "rank": 22,
+     "name": "Dailyn Swain",
+     "team": "Texas",
+     "p30": 0.739,
+     "pick": 15
+    },
+    {
+     "rank": 23,
+     "name": "Isaiah Evans",
+     "team": "Duke",
+     "p30": 0.752,
+     "pick": 33
+    },
+    {
+     "rank": 24,
+     "name": "Aday Mara",
+     "team": "Michigan",
+     "p30": 0.568,
+     "pick": 12
+    },
+    {
+     "rank": 25,
+     "name": "Bennett Stirtz",
+     "team": "Iowa",
+     "p30": 0.38,
+     "pick": 16
+    },
+    {
+     "rank": 26,
+     "name": "Thomas Haugh",
+     "team": "Florida",
+     "p30": 0.342,
+     "pick": null
+    },
+    {
+     "rank": 27,
+     "name": "Tyler Tanner",
+     "team": "Vanderbilt",
+     "p30": 0.274,
+     "pick": null
+    },
+    {
+     "rank": 28,
+     "name": "Morez Johnson Jr.",
+     "team": "Michigan",
+     "p30": 0.43,
+     "pick": 9
+    },
+    {
+     "rank": 29,
+     "name": "Henri Veesaar",
+     "team": "North Carolina",
+     "p30": 0.582,
+     "pick": 52
+    },
+    {
+     "rank": 30,
+     "name": "Shelton Henderson",
+     "team": "Miami FL",
+     "p30": 0.423,
+     "pick": null
+    }
+   ]
+  }
+ },
+ "success": {
+  "years": [
+   2012,
+   2022
+  ],
+  "n": 14013,
+  "n_success": 192,
+  "n_drafted": 527,
+  "success_ws": 8.0,
+  "star_ws": 20.0,
+  "window": 4,
+  "model": {
+   "auc_all": 0.987,
+   "ll_all": 0.0301,
+   "auc_drafted": 0.7408,
+   "spearman_ws_drafted": 0.4239
+  },
+  "baseline": {
+   "auc_all": 0.9828,
+   "ll_all": 0.0322,
+   "auc_drafted": 0.7385
+  },
+  "draft_slot": {
+   "auc_drafted": 0.7732,
+   "spearman_ws_drafted": 0.5297
+  },
+  "per_year": [
+   {
+    "year": 2012,
+    "n": 1255,
+    "n_success": 18,
+    "n_drafted": 52,
+    "auc": 0.9896,
+    "auc_base": 0.9835,
+    "ll": 0.0271,
+    "ll_base": 0.0287,
+    "auc_drafted_model": 0.7859,
+    "auc_drafted_pick": 0.7868,
+    "spearman_ws_model": 0.5502,
+    "spearman_ws_pick": 0.5161
+   },
+   {
+    "year": 2013,
+    "n": 1266,
+    "n_success": 17,
+    "n_drafted": 46,
+    "auc": 0.9805,
+    "auc_base": 0.9745,
+    "ll": 0.0314,
+    "ll_base": 0.0344,
+    "auc_drafted_model": 0.7679,
+    "auc_drafted_pick": 0.8337,
+    "spearman_ws_model": 0.526,
+    "spearman_ws_pick": 0.7291
+   },
+   {
+    "year": 2014,
+    "n": 1312,
+    "n_success": 16,
+    "n_drafted": 45,
+    "auc": 0.9893,
+    "auc_base": 0.9846,
+    "ll": 0.0246,
+    "ll_base": 0.0285,
+    "auc_drafted_model": 0.7867,
+    "auc_drafted_pick": 0.7511,
+    "spearman_ws_model": 0.4227,
+    "spearman_ws_pick": 0.5397
+   },
+   {
+    "year": 2015,
+    "n": 1350,
+    "n_success": 19,
+    "n_drafted": 46,
+    "auc": 0.9911,
+    "auc_base": 0.9888,
+    "ll": 0.0291,
+    "ll_base": 0.0291,
+    "auc_drafted_model": 0.7321,
+    "auc_drafted_pick": 0.752,
+    "spearman_ws_model": 0.5416,
+    "spearman_ws_pick": 0.5707
+   },
+   {
+    "year": 2016,
+    "n": 1275,
+    "n_success": 12,
+    "n_drafted": 44,
+    "auc": 0.9859,
+    "auc_base": 0.984,
+    "ll": 0.0269,
+    "ll_base": 0.0271,
+    "auc_drafted_model": 0.7238,
+    "auc_drafted_pick": 0.8921,
+    "spearman_ws_model": 0.2908,
+    "spearman_ws_pick": 0.6459
+   },
+   {
+    "year": 2017,
+    "n": 1352,
+    "n_success": 16,
+    "n_drafted": 51,
+    "auc": 0.9884,
+    "auc_base": 0.9812,
+    "ll": 0.0284,
+    "ll_base": 0.0309,
+    "auc_drafted_model": 0.7,
+    "auc_drafted_pick": 0.7185,
+    "spearman_ws_model": 0.1982,
+    "spearman_ws_pick": 0.3501
+   },
+   {
+    "year": 2018,
+    "n": 1392,
+    "n_success": 20,
+    "n_drafted": 51,
+    "auc": 0.9849,
+    "auc_base": 0.9773,
+    "ll": 0.0323,
+    "ll_base": 0.0336,
+    "auc_drafted_model": 0.7615,
+    "auc_drafted_pick": 0.778,
+    "spearman_ws_model": 0.5552,
+    "spearman_ws_pick": 0.5586
+   },
+   {
+    "year": 2019,
+    "n": 1363,
+    "n_success": 20,
+    "n_drafted": 51,
+    "auc": 0.9838,
+    "auc_base": 0.9841,
+    "ll": 0.0333,
+    "ll_base": 0.0327,
+    "auc_drafted_model": 0.7509,
+    "auc_drafted_pick": 0.8062,
+    "spearman_ws_model": 0.3886,
+    "spearman_ws_pick": 0.554
+   },
+   {
+    "year": 2020,
+    "n": 1277,
+    "n_success": 22,
+    "n_drafted": 49,
+    "auc": 0.9895,
+    "auc_base": 0.9876,
+    "ll": 0.0342,
+    "ll_base": 0.039,
+    "auc_drafted_model": 0.6431,
+    "auc_drafted_pick": 0.7828,
+    "spearman_ws_model": 0.2082,
+    "spearman_ws_pick": 0.5777
+   },
+   {
+    "year": 2021,
+    "n": 860,
+    "n_success": 15,
+    "n_drafted": 49,
+    "auc": 0.9703,
+    "auc_base": 0.9677,
+    "ll": 0.0471,
+    "ll_base": 0.0494,
+    "auc_drafted_model": 0.6453,
+    "auc_drafted_pick": 0.6902,
+    "spearman_ws_model": 0.5034,
+    "spearman_ws_pick": 0.3361
+   },
+   {
+    "year": 2022,
+    "n": 1311,
+    "n_success": 17,
+    "n_drafted": 43,
+    "auc": 0.993,
+    "auc_base": 0.9903,
+    "ll": 0.0218,
+    "ll_base": 0.0265,
+    "auc_drafted_model": 0.8095,
+    "auc_drafted_pick": 0.8,
+    "spearman_ws_model": 0.3637,
+    "spearman_ws_pick": 0.4552
+   }
+  ],
+  "combined": {
+   "auc_drafted": 0.756,
+   "slot_only_auc_same_games": 0.7666,
+   "model_only_auc_same_games": 0.7245
+  },
+  "calibration": [
+   {
+    "lo": 0,
+    "hi": 0.02,
+    "n": 13108,
+    "pred": 0.0009,
+    "obs": 0.0006
+   },
+   {
+    "lo": 0.02,
+    "hi": 0.05,
+    "n": 313,
+    "pred": 0.0318,
+    "obs": 0.0543
+   },
+   {
+    "lo": 0.05,
+    "hi": 0.15,
+    "n": 265,
+    "pred": 0.0874,
+    "obs": 0.1321
+   },
+   {
+    "lo": 0.15,
+    "hi": 0.3,
+    "n": 114,
+    "pred": 0.2166,
+    "obs": 0.2105
+   },
+   {
+    "lo": 0.3,
+    "hi": 0.5,
+    "n": 83,
+    "pred": 0.3847,
+    "obs": 0.3253
+   },
+   {
+    "lo": 0.5,
+    "hi": 1.0,
+    "n": 130,
+    "pred": 0.7394,
+    "obs": 0.6231
+   }
+  ],
+  "platt": {
+   "a": -0.2315,
+   "b": 0.8895
+  },
+  "last_class": {
+   "year": 2022,
+   "board": [
+    {
+     "rank": 1,
+     "name": "Chet Holmgren",
+     "team": "Gonzaga",
+     "p_success": 0.984,
+     "pick": 2,
+     "ws": 21.2,
+     "success": true
+    },
+    {
+     "rank": 2,
+     "name": "Walker Kessler",
+     "team": "Auburn",
+     "p_success": 0.921,
+     "pick": 22,
+     "ws": 17.1,
+     "success": true
+    },
+    {
+     "rank": 3,
+     "name": "Mark Williams",
+     "team": "Duke",
+     "p_success": 0.918,
+     "pick": 15,
+     "ws": 15.9,
+     "success": true
+    },
+    {
+     "rank": 4,
+     "name": "Jalen Duren",
+     "team": "Memphis",
+     "p_success": 0.907,
+     "pick": 13,
+     "ws": 29.5,
+     "success": true
+    },
+    {
+     "rank": 5,
+     "name": "Paolo Banchero",
+     "team": "Duke",
+     "p_success": 0.888,
+     "pick": 1,
+     "ws": 16.2,
+     "success": true
+    },
+    {
+     "rank": 6,
+     "name": "Keegan Murray",
+     "team": "Iowa",
+     "p_success": 0.819,
+     "pick": 4,
+     "ws": 14.1,
+     "success": true
+    },
+    {
+     "rank": 7,
+     "name": "Jabari Smith",
+     "team": "Auburn",
+     "p_success": 0.779,
+     "pick": 3,
+     "ws": 18.3,
+     "success": true
+    },
+    {
+     "rank": 8,
+     "name": "Kendall Brown",
+     "team": "Baylor",
+     "p_success": 0.733,
+     "pick": 48,
+     "ws": 0.2,
+     "success": false
+    },
+    {
+     "rank": 9,
+     "name": "Jeremy Sochan",
+     "team": "Baylor",
+     "p_success": 0.64,
+     "pick": 9,
+     "ws": 5.5,
+     "success": false
+    },
+    {
+     "rank": 10,
+     "name": "Tari Eason",
+     "team": "LSU",
+     "p_success": 0.624,
+     "pick": 17,
+     "ws": 11.8,
+     "success": true
+    },
+    {
+     "rank": 11,
+     "name": "Christian Koloko",
+     "team": "Arizona",
+     "p_success": 0.565,
+     "pick": 33,
+     "ws": 2.9,
+     "success": false
+    },
+    {
+     "rank": 12,
+     "name": "Bennedict Mathurin",
+     "team": "Arizona",
+     "p_success": 0.531,
+     "pick": 6,
+     "ws": 8.3,
+     "success": true
+    },
+    {
+     "rank": 13,
+     "name": "Jake LaRavia",
+     "team": "Wake Forest",
+     "p_success": 0.445,
+     "pick": 19,
+     "ws": 8.2,
+     "success": true
+    },
+    {
+     "rank": 14,
+     "name": "E.J. Liddell",
+     "team": "Ohio St.",
+     "p_success": 0.437,
+     "pick": 41,
+     "ws": 0.6,
+     "success": false
+    },
+    {
+     "rank": 15,
+     "name": "AJ Griffin",
+     "team": "Duke",
+     "p_success": 0.38,
+     "pick": 16,
+     "ws": 1.8,
+     "success": false
+    },
+    {
+     "rank": 16,
+     "name": "Trevion Williams",
+     "team": "Purdue",
+     "p_success": 0.357,
+     "pick": null,
+     "ws": 0.0,
+     "success": false
+    },
+    {
+     "rank": 17,
+     "name": "Jaylin Williams",
+     "team": "Arkansas",
+     "p_success": 0.34,
+     "pick": 34,
+     "ws": 11.7,
+     "success": true
+    },
+    {
+     "rank": 18,
+     "name": "Dalen Terry",
+     "team": "Arizona",
+     "p_success": 0.327,
+     "pick": 18,
+     "ws": 3.1,
+     "success": false
+    },
+    {
+     "rank": 19,
+     "name": "Christian Braun",
+     "team": "Kansas",
+     "p_success": 0.324,
+     "pick": 21,
+     "ws": 16.3,
+     "success": true
+    },
+    {
+     "rank": 20,
+     "name": "Kennedy Chandler",
+     "team": "Tennessee",
+     "p_success": 0.32,
+     "pick": 38,
+     "ws": 0.5,
+     "success": false
+    }
+   ]
+  }
+ }
+}

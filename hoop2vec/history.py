@@ -102,6 +102,8 @@ def export(seasons=None):
         save_ps(PL.load_player_seasons([s], refresh_current=False), s)
         print("history", s, flush=True)
     save_conf(conferences(seasons))
+    from .prospects import update_history
+    update_history()
 
 
 # ---------------------------------------------------------------- current-season snapshot

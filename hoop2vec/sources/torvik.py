@@ -179,3 +179,27 @@ def team_results(season: int) -> pd.DataFrame:
     t = t.rename(columns={"team": "team", "adjoe": "t_adjoe", "adjde": "t_adjde", "barthag": "t_barthag"})
     t["season"] = season
     return t[["season", "team", "conf", "t_adjoe", "t_adjde", "t_barthag"]]
+
+
+# full player-season table (prospect models): column index -> name
+FULL_COLS = {
+    0: "player", 1: "team", 2: "conf", 3: "gp", 4: "min_pct", 5: "ortg", 6: "usg", 7: "efg", 8: "ts", 9: "orb_pct",
+    10: "drb_pct", 11: "ast_pct", 12: "to_pct", 13: "ftm", 14: "fta", 15: "ft_pct", 16: "twopm", 17: "twopa",
+    18: "twop_pct", 19: "tpm", 20: "tpa", 21: "tp_pct", 22: "blk_pct", 23: "stl_pct", 24: "ftr", 25: "cls", 26: "ht",
+    28: "porpag", 29: "adjoe", 30: "pfr", 31: "year", 32: "pid", 34: "rec_rank", 35: "ast_tov", 36: "rim_m",
+    37: "rim_a", 38: "mid_m", 39: "mid_a", 42: "dunk_m", 43: "dunk_a", 45: "pick", 46: "drtg", 47: "adrtg",
+    48: "dporpag", 49: "stops", 50: "bpm", 51: "obpm", 52: "dbpm", 53: "gbpm", 54: "mpg", 55: "ogbpm", 56: "dgbpm",
+    57: "orb_pg", 58: "drb_pg", 59: "trb_pg", 60: "ast_pg", 61: "stl_pg", 62: "blk_pg", 63: "pts_pg", 64: "role",
+    66: "dob",
+}
+
+
+def player_seasons_full(season: int, refresh: bool | None = None) -> pd.DataFrame:
+    """Every column of Torvik's player-season table we use, named (incl. NBA draft pick and date of birth).
+    Same file as ``player_seasons`` (shared cache), so a daily run downloads it once."""
+    raw = cached_bytes(f"{BASE}/getadvstats.php?year={season}&csv=1", OUT / f"{season}_advstats.csv",
+                       refresh=_refresh(season) if refresh is None else refresh)
+    a = pd.read_csv(io.BytesIO(raw), header=None, low_memory=False)
+    a = a[[c for c in FULL_COLS if c in a.columns]].rename(columns=FULL_COLS)
+    a["season"] = season
+    return a

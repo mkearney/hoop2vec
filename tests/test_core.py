@@ -73,3 +73,24 @@ def test_deleak_replaces_final_ratings_with_pregame():
     X = np.c_[np.ones(len(team)), own_pre, own_fin]
     b = np.linalg.lstsq(X, resid, rcond=None)[0]
     assert abs(b[2]) < 0.02 < abs(b[1])
+
+
+def test_draft_probabilities_are_cumulative():
+    """P(pick <= 5) <= P(pick <= 14) <= P(pick <= 30) <= P(pick <= 60) for every player."""
+    from hoop2vec import prospects as PR
+    rng = np.random.default_rng(2)
+    n = 3000
+    D = pd.DataFrame({c: rng.normal(size=n) for c in PR.FEATURES})
+    score = D["r_bpm"] + 0.5 * D["rec"]
+    pick = np.where(score > 2.2, np.ceil(rng.uniform(1, 60, n)), np.nan)
+    D["pick_now"] = pick
+    out = PR.DraftModel("logit").fit(D).predict(D)
+    P = out[[f"p{k}" for k in PR.THRESHOLDS]].to_numpy()
+    assert np.all(np.diff(P, axis=1) >= -1e-12)
+
+
+def test_sanitize_makes_json_safe():
+    import json
+    from hoop2vec.prospects import _sanitize
+    x = _sanitize({"a": np.float64("nan"), "b": [np.int64(3), np.float32(1.23456)], "c": np.bool_(True)})
+    assert json.loads(json.dumps(x, allow_nan=False)) == {"a": None, "b": [3, 1.2346], "c": True}
