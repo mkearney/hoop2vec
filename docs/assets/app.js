@@ -129,6 +129,12 @@
     const params = new URLSearchParams(query || "");
     $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === (NAV[name] || name)));
     const fn = routes[name] || viewRatings;
+    // tab title per section (link previews use the static tags in the page head)
+    const sec = { ratings: "Ratings", players: "Players", prospects: "Prospects", bracket: "Bracket", playoffs: "Playoffs",
+      matchup: "Matchup Lab", games: "Games", styles: "Styles", guide: "Style guide", method: "Method" }[name];
+    const lgName = { mens: "Men's college", womens: "Women's college", nba: "NBA", wnba: "WNBA" }[LEAGUE];
+    document.title = [name === "team" && arg ? decodeURIComponent(arg).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : sec,
+      lgName, "hoop2vec"].filter(Boolean).join(" · ");
     app.innerHTML = `<div class="loading">Loading…</div>`;
     try {
       await fn(arg ? decodeURIComponent(arg) : null, params);
