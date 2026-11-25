@@ -59,6 +59,11 @@ def test_site_pages(tmp_path, monkeypatch):
     assert 'property="og:image" content="https://mkearney.github.io/hoop2vec/nba/share.png?v=20261125"' in nba
     assert "No. 1 today: Spurs. Title favorite: Celtics (20%)." in nba and 'name="twitter:card" content="summary_large_image"' in nba
     assert (tmp_path / "nba" / "share.png").exists() and (tmp_path / "share.png").exists()
+    import re
+    ld = json.loads(re.search(r'<script type="application/ld\+json" id="ld">(.*?)</script>', nba).group(1))
+    page = next(x for x in ld["@graph"] if x["@type"] == "WebPage")
+    assert page["dateModified"] == "2026-11-25T17:25:00Z" and page["about"]["name"] == "National Basketball Association"
+    assert [x["item"]["name"] for x in page["mainEntity"]["itemListElement"]] == ["Spurs", "Celtics", "Rockets"]
     from PIL import Image
     assert Image.open(tmp_path / "nba" / "share.png").size == (1200, 630)
     home = (tmp_path / "index.html").read_text()

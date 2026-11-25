@@ -20,8 +20,37 @@ FONTS_CSS = ("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;70
              "&display=swap")
 
 
+ABOUT = {"mens": "NCAA Division I men's basketball", "womens": "NCAA Division I women's basketball",
+         "nba": "National Basketball Association", "wnba": "Women's National Basketball Association"}
+
+
+def structured(*, title: str, desc: str, url: str, image: str | None, S: dict, league: str | None) -> dict:
+    """schema.org graph: the site, this page (exact update time, image, what it's about) and, on a league page,
+    today's top five as a ranked list of teams. The app rewrites the time and the list from the data it loads."""
+    from .share import SITE_URL
+    site_id = f"{SITE_URL}/#website"
+    page = {"@type": "WebPage", "@id": f"{url}#webpage", "url": url, "name": title, "description": desc,
+            "inLanguage": "en", "isPartOf": {"@id": site_id}}
+    if S.get("iso"):
+        page["dateModified"] = S["iso"]
+    if image:
+        page["primaryImageOfPage"] = {"@type": "ImageObject", "url": image, "width": 1200, "height": 630}
+    if league:
+        page["about"] = {"@type": "SportsOrganization", "name": ABOUT[league]}
+        if S.get("top"):
+            page["mainEntity"] = {"@type": "ItemList", "name": "Power ratings: top 5", "itemListOrder": "https://schema.org/ItemListOrderAscending",
+                                  "numberOfItems": len(S["top"]), "itemListElement": [
+                                      {"@type": "ListItem", "position": t["rank"], "item": {"@type": "SportsTeam", "name": t["team"]}}
+                                      for t in S["top"]]}
+    else:
+        page["about"] = [{"@type": "SportsOrganization", "name": n} for n in ABOUT.values()]
+    site = {"@type": "WebSite", "@id": site_id, "url": f"{SITE_URL}/", "name": "hoop2vec",
+            "description": "Basketball ratings and forecasts from free public data.", "inLanguage": "en"}
+    return {"@context": "https://schema.org", "@graph": [site, page]}
+
+
 def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp: str | None, img_alt: str,
-         modified: str | None = None, home: bool = False) -> str:
+         modified: str | None = None, home: bool = False, S: dict | None = None, league: str | None = None) -> str:
     """<head> with everything link previews and browsers read: description, canonical URL, Open Graph and Twitter
     card tags (the day's summary and share image, versioned by date so platforms refetch), icons, theme color and
     a small schema.org record."""
@@ -30,12 +59,7 @@ def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp:
         return html.escape(x, quote=False).replace('"', "&quot;")
     url = f"{SITE_URL}/{path}"
     image = f"{SITE_URL}/{img}" + (f"?v={stamp}" if stamp else "") if img else None
-    ld = {"@context": "https://schema.org", "@type": "WebSite" if home else "WebPage", "name": title, "url": url,
-          "description": desc, "inLanguage": "en"}
-    if modified:
-        ld["dateModified"] = modified
-    if image:
-        ld["image"] = image
+    ld = structured(title=title, desc=desc, url=url, image=image, S=S or {}, league=league)
     og_img = (f'''
   <meta property="og:image" content="{e(image)}">
   <meta property="og:image:type" content="image/png">
@@ -70,7 +94,7 @@ def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp:
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="{FONTS_CSS}" rel="stylesheet">
   <link rel="stylesheet" href="{root}assets/style.css">
-  <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+  <script type="application/ld+json" id="ld">{json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")}</script>
 </head>
 '''
 
@@ -121,7 +145,7 @@ def league_page(league: str, S: dict | None = None) -> str:
            + (f", updated {S['updated']}" if S.get("updated") else "") + (f". {S['headline']}." if S.get("headline") else "")
            + (" Top 5: " + ", ".join(t["team"] for t in S["top"]) + "." if S.get("top") else ""))
     return head(title=title, desc=S["desc"], path=f"{league}/", root="../", img=f"{league}/share.png" if has_img else None,
-                stamp=S.get("stamp"), img_alt=alt, modified=_modified(S)) + f'''<body data-league="{league}">
+                stamp=S.get("stamp"), img_alt=alt, modified=_modified(S), S=S, league=league) + f'''<body data-league="{league}">
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="../">{BALL}<span>hoop2vec</span></a>
@@ -179,7 +203,7 @@ def chooser_page(summaries: dict | None = None) -> str:
         for lg in LEAGUES if summaries.get(lg, {}).get("top"))
     return head(title="hoop2vec · Basketball ratings and forecasts", desc=H.get("desc", ""), path="", root="",
                 img="share.png" if (SITE_ROOT / "share.png").exists() else None, stamp=H.get("stamp"), img_alt=alt + ".",
-                modified=_modified(H), home=True) + f'''<body class="chooser">
+                modified=_modified(H), home=True, S=H) + f'''<body class="chooser">
   <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./">{BALL}<span>hoop2vec</span></a>
     <div class="top-right" style="margin-left:auto">{THEME_BTN}</div></div></header>
   <main class="wrap">
@@ -206,6 +230,14 @@ def chooser_page(summaries: dict | None = None) -> str:
         if (!d) return;
         document.getElementById("top-" + lg).innerHTML = "<b>Top 5 today</b>" + d.teams.slice(0, 5).map((t) =>
           `<span class="row">${{t.logo ? `<img class="logo" src="${{esc(t.logo)}}" alt="" loading="lazy">` : ""}}<span>${{t.rank}}. ${{esc(t.team)}}</span></span>`).join("");
+        // structured data follows the freshest league data (the page itself may be a cached copy)
+        const m = /^(\\d{{4}}-\\d{{2}}-\\d{{2}}) (\\d{{2}}:\\d{{2}})/.exec(d.updated || ""), el = document.getElementById("ld");
+        if (m && el) {{
+          try {{
+            const ld = JSON.parse(el.textContent), page = ld["@graph"].find((x) => x["@type"] === "WebPage"), iso = `${{m[1]}}T${{m[2]}}:00Z`;
+            if (!page.dateModified || iso > page.dateModified) {{ page.dateModified = iso; el.textContent = JSON.stringify(ld).replace(/<\\//g, "<\\\\/"); }}
+          }} catch (e) {{}}
+        }}
       }}).catch(() => {{}});
     }}
   }})();

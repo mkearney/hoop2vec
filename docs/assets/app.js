@@ -145,6 +145,24 @@
     window.scrollTo({ top: 0 });
   }
   window.addEventListener("hashchange", route);
+  // structured data (page head) follows the data actually loaded: HTML can be cached, data/*.json never is
+  function syncLd(updated, ratings) {
+    const el = document.getElementById("ld");
+    if (!el) return;
+    try {
+      const ld = JSON.parse(el.textContent), page = (ld["@graph"] || []).find((x) => x["@type"] === "WebPage");
+      if (!page) return;
+      const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/.exec(updated || "");
+      if (m) page.dateModified = `${m[1]}T${m[2]}:00Z`;
+      if (ratings && ratings.teams) {
+        const top = ratings.teams.slice().sort((a, b) => a.rank - b.rank).slice(0, 5);
+        page.mainEntity = { "@type": "ItemList", name: "Power ratings: top 5", itemListOrder: "https://schema.org/ItemListOrderAscending", numberOfItems: top.length,
+          itemListElement: top.map((t) => ({ "@type": "ListItem", position: t.rank, item: { "@type": "SportsTeam", name: t.team } })) };
+      }
+      el.textContent = JSON.stringify(ld).replace(/<\//g, "<\\/");
+    } catch (e) { /* leave the published version */ }
+  }
+  Promise.all([get("meta.json", true), get("ratings.json", true)]).then(([m, r]) => syncLd(r && r.updated, r));
   get("meta.json", true).then((m) => {
     if (!m) return;
     const src = ESPN_ONLY || m.source !== "espn" ? "" : m.torvik_through ? ` · Torvik thru ${m.torvik_through.slice(5)}, ESPN after` : " · ESPN data (backup)";

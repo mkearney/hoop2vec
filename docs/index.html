@@ -31,7 +31,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "hoop2vec · Basketball ratings and forecasts", "url": "https://mkearney.github.io/hoop2vec/", "description": "Power ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, updated every morning from free public data.", "inLanguage": "en", "dateModified": "2026-11-25", "image": "https://mkearney.github.io/hoop2vec/share.png?v=20261125"}</script>
+  <script type="application/ld+json" id="ld">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://mkearney.github.io/hoop2vec/#website", "url": "https://mkearney.github.io/hoop2vec/", "name": "hoop2vec", "description": "Basketball ratings and forecasts from free public data.", "inLanguage": "en"}, {"@type": "WebPage", "@id": "https://mkearney.github.io/hoop2vec/#webpage", "url": "https://mkearney.github.io/hoop2vec/", "name": "hoop2vec · Basketball ratings and forecasts", "description": "Power ratings, game forecasts and player values for men's and women's college basketball, the NBA and the WNBA, updated every morning from free public data.", "inLanguage": "en", "isPartOf": {"@id": "https://mkearney.github.io/hoop2vec/#website"}, "dateModified": "2026-11-25T17:27:00Z", "primaryImageOfPage": {"@type": "ImageObject", "url": "https://mkearney.github.io/hoop2vec/share.png?v=20261125", "width": 1200, "height": 630}, "about": [{"@type": "SportsOrganization", "name": "NCAA Division I men's basketball"}, {"@type": "SportsOrganization", "name": "NCAA Division I women's basketball"}, {"@type": "SportsOrganization", "name": "National Basketball Association"}, {"@type": "SportsOrganization", "name": "Women's National Basketball Association"}]}]}</script>
 </head>
 <body class="chooser">
   <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./"><svg class="brand-ball" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#eb6834"/><path d="M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44" stroke="#111" stroke-width="3.5" fill="none"/></svg><span>hoop2vec</span></a>
@@ -88,6 +88,14 @@
         if (!d) return;
         document.getElementById("top-" + lg).innerHTML = "<b>Top 5 today</b>" + d.teams.slice(0, 5).map((t) =>
           `<span class="row">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="" loading="lazy">` : ""}<span>${t.rank}. ${esc(t.team)}</span></span>`).join("");
+        // structured data follows the freshest league data (the page itself may be a cached copy)
+        const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/.exec(d.updated || ""), el = document.getElementById("ld");
+        if (m && el) {
+          try {
+            const ld = JSON.parse(el.textContent), page = ld["@graph"].find((x) => x["@type"] === "WebPage"), iso = `${m[1]}T${m[2]}:00Z`;
+            if (!page.dateModified || iso > page.dateModified) { page.dateModified = iso; el.textContent = JSON.stringify(ld).replace(/<\//g, "<\\/"); }
+          } catch (e) {}
+        }
       }).catch(() => {});
     }
   })();

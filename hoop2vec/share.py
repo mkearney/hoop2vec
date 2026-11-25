@@ -43,6 +43,14 @@ def _date(updated: str | None) -> dt.date | None:
         return None
 
 
+def _iso(updated: str | None) -> str | None:
+    """'2026-11-25 17:27 UTC' -> '2026-11-25T17:27:00Z' (the data's own update time, for structured data)."""
+    try:
+        return dt.datetime.strptime(str(updated).replace(" UTC", ""), "%Y-%m-%d %H:%M").strftime("%Y-%m-%dT%H:%M:00Z")
+    except ValueError:
+        return None
+
+
 def _pct(p: float) -> str:
     return "<1%" if p < 0.005 else f"{round(100 * p)}%"
 
@@ -57,6 +65,7 @@ def summary(league: str) -> dict:
     d = _date(r.get("updated"))
     out["updated"] = f"{d:%b} {d.day}, {d.year}" if d else None
     out["stamp"] = f"{d:%Y%m%d}" if d else None
+    out["iso"] = _iso(r.get("updated"))
     out["top"] = [{"rank": t["rank"], "team": t["team"], "power": t.get("power"), "logo": t.get("logo")}
                   for t in sorted(r["teams"], key=lambda t: t["rank"])[:5]]
     no1 = out["top"][0]["team"]
@@ -248,8 +257,9 @@ def render_icons(out_dir: Path):
 
 def build_summaries() -> dict:
     out = {lg: summary(lg) for lg in NAMES}
-    out["home"] = {"desc": _desc("home", None), "stamp": max((s["stamp"] for s in out.values() if s.get("stamp")),
-                                                               default=None)}
+    out["home"] = {"desc": _desc("home", None),
+                   "stamp": max((s["stamp"] for s in out.values() if s.get("stamp")), default=None),
+                   "iso": max((s["iso"] for s in out.values() if s.get("iso")), default=None)}
     return out
 
 
