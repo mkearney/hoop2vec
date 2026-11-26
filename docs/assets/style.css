@@ -455,3 +455,22 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .db-p { text-align: right; color: var(--text-2); }
 .db-p.lead { color: var(--text); font-weight: 600; }
 @media (max-width: 640px) { .db-row { grid-template-columns: 20px minmax(0, 1fr) repeat(3, 44px) !important; gap: 6px; } .db-head span { font-size: 10px; letter-spacing: 0; } }
+
+/* ------------------------------------------------------------------ player pages: shot chart + career */
+.plink { color: inherit; }
+.plink:hover { color: var(--accent-ink); }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.chart-head h2 { margin: 0; }
+.chart-head .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.court { display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; }
+.court-bg { fill: var(--surface-2); }
+.court-lines * { fill: none; stroke: var(--text-3); stroke-width: .16; }
+.court-lines .board { stroke-width: .32; stroke: var(--text-2); }
+.court .shot { stroke: var(--text-3); stroke-opacity: .55; stroke-width: .06; }
+.court .zlab { font: 700 1.9px Inter, system-ui, sans-serif; fill: var(--text); text-anchor: middle; }
+.court .zsub { font: 500 1.15px Inter, system-ui, sans-serif; fill: var(--text-2); text-anchor: middle; }
+.court .zlab.sm { font-size: 1.15px; }
+.court .zsub.sm { font-size: .85px; }
+.zdot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; border: 1px solid var(--border); }
+table.career tr.total td { border-top: 1px solid var(--border); font-weight: 600; }
+table.zones td:first-child { min-width: 128px; }

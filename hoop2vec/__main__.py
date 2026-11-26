@@ -10,6 +10,8 @@ publish   re-export the site from cached features (fast)
 offline   like daily, but without any network refresh (uses local caches)
 history   after a season ends: refresh the committed history/ bundle
 ingest    play-by-play ingest for seasons, e.g. `ingest 2015-2026` (needed to refit identities)
+shots     one-time backfill of shot locations for seasons ingested before they were kept, e.g. `shots 2008-2026`
+          (player shot charts; the daily job does the current season by itself). Then `publish` to re-export.
 style     refit the team-identity model from the league's play-by-play seasons (`--rename` re-derives names)
 tune      tune the dynamic (Kalman) rating parameters for the league (checked on held-out recent seasons)
 site      rewrite the static page shells (docs/index.html chooser + docs/<league>/index.html)
@@ -41,12 +43,12 @@ if __name__ == "__main__":
         from .site import write
         write()
         raise SystemExit(0)
-    if mode == "ingest":
+    if mode in ("ingest", "shots"):
         from .ingest import ingest_season
         arg = sys.argv[2] if len(sys.argv) > 2 else ""
         a, _, b = arg.partition("-")
         for s in range(int(a), int(b or a) + 1):
-            ingest_season(s)
+            ingest_season(s, shots=True) if mode == "shots" else ingest_season(s)
         raise SystemExit(0)
     if mode not in ("daily", "train", "backtest", "all", "publish", "offline"):
         raise SystemExit(__doc__)

@@ -121,13 +121,13 @@
     try { localStorage.setItem("hoop2vec-theme", root.dataset.theme); } catch (e) { /* ignore */ }
   });
   const routes = { playoffs: viewPlayoffs, ratings: viewRatings, players: viewPlayers, prospects: viewProspects, team: viewTeam, bracket: viewBracket, matchup: viewMatchup, games: viewGames,
-    styles: viewStyles, guide: viewGuide, method: viewMethod };
-  const NAV = { team: "ratings", guide: "styles" };
+    styles: viewStyles, guide: viewGuide, method: viewMethod, player: viewPlayer };
+  const NAV = { team: "ratings", guide: "styles", player: "players" };
   async function route() {
     hideTip();
     const h = location.hash.replace(/^#\/?/, "") || "ratings";
     const [path, query] = h.split("?");
-    const [name, arg] = path.split("/");
+    const [name, arg, arg2] = path.split("/");
     const params = new URLSearchParams(query || "");
     $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === (NAV[name] || name)));
     const fn = routes[name] || viewRatings;
@@ -139,7 +139,7 @@
       lgName, "hoop2vec"].filter(Boolean).join(" · ");
     app.innerHTML = `<div class="loading">${art("mark")}<span>Loading…</span></div>`;
     try {
-      await fn(arg ? decodeURIComponent(arg) : null, params);
+      await fn(arg ? decodeURIComponent(arg) : null, params, arg2 ? decodeURIComponent(arg2) : null);
     } catch (e) {
       console.error(e);
       app.innerHTML = `<div class="card">Could not load data (${esc(e.message)}). The daily pipeline may not have run yet.</div>`;
@@ -310,7 +310,7 @@
       const mx = Math.max(...top.map((p) => p[key]));
       return `<div class="card"><h2>${title}</h2><p class="note" style="margin-top:-4px">${note}</p>${top.map((p, i) => `
         <div class="odds-row lb-row"><span class="faint num">${i + 1}</span>
-          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm"><b>${esc(p.name)}</b> <span class="faint small">${esc(p.team)}</span></span></span>
+          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm">${playerLink(p)} <span class="faint small">${esc(p.team)}</span></span></span>
           <div class="pbar lb-bar"><span style="width:${(100 * Math.max(0, p[key]) / mx).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${sgn(p[key])}</div></div>`).join("")}</div>`;
     };
     app.innerHTML = `
@@ -362,7 +362,7 @@
         const txt = ["impact", "value", "o", "d"].includes(c) ? sgn(v, dg) : fmt(v, dg);
         return `<td><span class="heat num" style="${heat(pctRank(dist[c], v), inv === true)}">${isNum(v) ? txt : "–"}</span></td>`;
       }).join("");
-      return `<tr><td class="rankcol">${i + 1}</td><td class="l"><b>${esc(p.name)}</b>${p.status ? ` <span class="pill bad" title="${esc(p.status)}">✚</span>` : ""}<div class="small faint">${esc([p.cls, htFmt(p.ht), p.pos].filter(Boolean).join(" · "))}</div></td>
+      return `<tr><td class="rankcol">${i + 1}</td><td class="l">${playerLink(p)}${p.status ? ` <span class="pill bad" title="${esc(p.status)}">✚</span>` : ""}<div class="small faint">${esc([p.cls, htFmt(p.ht), p.pos].filter(Boolean).join(" · "))}</div></td>
         <td class="l">${teamLink(p.team)}</td>${cells}</tr>`;
     }).join("");
     const tbl = $("#ptbl");
@@ -381,6 +381,178 @@
     }
   }
 
+
+  // ================================================================ PLAYER PAGES (career + shot chart)
+  const playerHref = (team, pid) => `#/player/${slugify(team)}/${pid}`;
+  const playerLink = (p) => (p.pid ? `<a href="${playerHref(p.team, p.pid)}" class="plink"><b>${esc(p.name)}</b></a>` : `<b>${esc(p.name)}</b>`);
+  // court geometry in feet, basket at (25, 0), y toward half court (ESPN's shot coordinates)
+  function courtSpec(season) {
+    const s = Number(season);
+    if (IS_PRO) return LEAGUE === "nba" ? { arc: 23.75, corner: 22, lane: 16, ra: 4 } : (s >= 2013 ? { arc: 22.15, corner: 21.65, lane: 16, ra: 4 } : { arc: 20.5, corner: 20.5, lane: 16, ra: 4 });
+    const pro3 = IS_W ? s >= 2022 : s >= 2020;   // NCAA moved to the 22' 1.75" line: men 2019-20, women 2021-22
+    return pro3 ? { arc: 22.15, corner: 21.65, lane: 12, ra: 4 } : { arc: 20.75, corner: 20.75, lane: 12, ra: 4 };
+  }
+  const BASE = -5.25, TOP = 34, CORNER_Y = 8;   // baseline and top of the drawn floor (feet from the basket); corner-3 cutoff
+  const sy = (y) => +(TOP - y).toFixed(3);       // court y -> svg y (basket near the bottom)
+  const ZONE_INFO = { rim: ["At the rim", "Layups, dunks, tips and shots within 4 ft"], smid: ["Short mid-range", "Twos from 5–14 ft"],
+    lmid: ["Long mid-range", "Twos from 15 ft out to the 3-point line"], c3: ["Corner 3", "Threes from the corners"], ab3: ["Above-the-break 3", "Threes outside the corners"],
+    mid: ["Other 2s", "Twos away from the rim"], three: ["3-pointers", "Every three"] };
+  const SCHEME_ZONES = { full: ["rim", "smid", "lmid", "c3", "ab3"], dist: ["rim", "smid", "lmid", "three"], coarse: ["rim", "mid", "three"] };
+  function courtPaths(c) {
+    const yc = Math.sqrt(Math.max(c.arc ** 2 - c.corner ** 2, 0));   // where the straight corner line meets the arc
+    const xl = 25 - c.corner, xr = 25 + c.corner;
+    const inside = `M${xl} ${sy(BASE)}L${xl} ${sy(yc)}A${c.arc} ${c.arc} 0 0 1 ${xr} ${sy(yc)}L${xr} ${sy(BASE)}Z`;
+    const circ = (r, cy = 0) => `M${25 - r} ${sy(cy)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+    const court = `M0 0H50V${sy(BASE)}H0Z`;
+    const corners = `M0 ${sy(BASE)}H${xl}V${sy(CORNER_Y)}H0Z M${xr} ${sy(BASE)}H50V${sy(CORNER_Y)}H${xr}Z`;
+    return { inside, court, corners, yc, xl, xr,
+      zone: { rim: circ(c.ra), smid: circ(14) + circ(c.ra), lmid: inside + circ(14), c3: corners, ab3: court + inside + corners,
+        mid: inside + circ(c.ra), three: court + inside } };
+  }
+  function courtLines(c, P) {
+    const lw = c.lane / 2, ft = 19 + BASE;   // free-throw line 19 ft from the baseline
+    return `<g class="court-lines">
+      <rect x="0" y="0" width="50" height="${sy(BASE)}"/>
+      <path d="M${P.xl} ${sy(BASE)}L${P.xl} ${sy(P.yc)}A${c.arc} ${c.arc} 0 0 1 ${P.xr} ${sy(P.yc)}L${P.xr} ${sy(BASE)}"/>
+      <rect x="${25 - lw}" y="${sy(ft)}" width="${c.lane}" height="${(ft - BASE).toFixed(2)}"/>
+      <path d="M19 ${sy(ft)}A6 6 0 0 1 31 ${sy(ft)}"/><path d="M19 ${sy(ft)}A6 6 0 0 0 31 ${sy(ft)}" stroke-dasharray=".8 .8"/>
+      <path d="M${25 - c.ra} ${sy(0)}A${c.ra} ${c.ra} 0 0 1 ${25 + c.ra} ${sy(0)}"/>
+      <line x1="22" y1="${sy(-1.25)}" x2="28" y2="${sy(-1.25)}" class="board"/><circle cx="25" cy="${sy(0)}" r=".75"/></g>`;
+  }
+  // FG% vs league in points -> diverging fill (blue above, red below, gray near average)
+  const zoneFill = (d, floor = 18) => {
+    if (!isNum(d)) return "var(--surface-3)";
+    const t = Math.max(-1, Math.min(1, d / 10));
+    return `color-mix(in srgb, ${t >= 0 ? "var(--heat-pos)" : "var(--heat-neg)"} ${Math.round(floor + (80 - floor) * Math.abs(t))}%, var(--surface-2))`;
+  };
+  function zoneStats(pz, lz, keys) {
+    const tot = keys.reduce((s, k) => s + (pz[k] ? pz[k][0] : 0), 0), ltot = keys.reduce((s, k) => s + (lz[k] ? lz[k][0] : 0), 0);
+    const out = {};
+    keys.forEach((k) => {
+      const [a, m] = pz[k] || [0, 0], [la, lm] = lz[k] || [0, 0];
+      const fg = a ? (100 * m) / a : null, lfg = la ? (100 * lm) / la : null;
+      out[k] = { a, m, fg, lfg, d: isNum(fg) && isNum(lfg) && a >= 5 ? fg - lfg : null, share: tot ? a / tot : 0, lshare: ltot ? la / ltot : 0 };
+    });
+    return { z: out, tot };
+  }
+  function shotChart(season, mode, rec, lg) {
+    const L = (lg && lg.seasons[season]) || { scheme: "full", zones: {} };
+    const keys = SCHEME_ZONES[L.scheme] || SCHEME_ZONES.full;
+    const { z } = zoneStats((rec.zones || {})[season] || {}, L.zones || {}, keys);
+    const c = courtSpec(season), P = courtPaths(c);
+    const located = mode === "loc" && rec.shots && rec.shots[season];
+    const zones = keys.map((k) => `<path d="${P.zone[k]}" fill-rule="evenodd" style="fill:${zoneFill(z[k].d)}" opacity="${located ? 0.22 : 0.92}"><title>${esc(ZONE_INFO[k][0])}: ${z[k].m}/${z[k].a}${isNum(z[k].fg) ? ` (${fmt(z[k].fg)}%, league ${fmt(z[k].lfg)}%)` : ""}</title></path>`).join("");
+    let marks = "";
+    if (located) {
+      const cells = rec.shots[season];
+      const mx = Math.max(...cells.map((x) => x[3]), 1);
+      const order = SCHEME_ZONES.full;
+      marks = cells.map(([x, y, zi, a, m]) => {
+        const zk = keys.includes(order[zi]) ? order[zi] : (zi >= 3 ? "three" : zi === 0 ? "rim" : keys.includes("mid") ? "mid" : order[zi]);
+        const r = (0.24 + 0.52 * Math.sqrt(a / mx)).toFixed(2);
+        return `<circle cx="${x}" cy="${sy(y)}" r="${r}" style="fill:${zoneFill(z[zk] ? z[zk].d : null, 42)}" class="shot"><title>${m}/${a} from ${Math.round(Math.hypot(x - 25, y))} ft</title></circle>`;
+      }).join("");
+    } else {
+      // label spots (x list, y of the FG% baseline) clear of the court lines for every league's geometry
+      const anchor = { rim: [[25], 2.4], smid: [[14.3, 35.7], 5.6], lmid: [[25], 17.4], c3: [[1.5, 48.5], 2.4], ab3: [[25], 28.5], mid: [[25], 17.4], three: [[25], 28.5] };
+      marks = keys.map((k) => {
+        const s = z[k]; if (!s.a) return "";
+        const [xs, y] = anchor[k], sm = k === "c3" ? " sm" : "";
+        return xs.map((x) => `<text x="${x}" y="${sy(y)}" class="zlab${sm}">${fmt(s.fg, 0)}%</text><text x="${x}" y="${sy(y - (sm ? 1.2 : 1.5))}" class="zsub${sm}">${s.m}/${s.a}</text>`).join("");
+      }).join("");
+    }
+    return `<svg class="court" viewBox="-0.5 -0.5 51 ${(sy(BASE) + 1).toFixed(2)}" role="img" aria-label="Shot chart, ${seasonLabel(season)}">
+      <defs><clipPath id="courtclip"><rect x="0" y="0" width="50" height="${sy(BASE)}"/></clipPath></defs>
+      <rect x="0" y="0" width="50" height="${sy(BASE)}" class="court-bg"/>
+      <g clip-path="url(#courtclip)">${zones}</g>${courtLines(c, P)}<g clip-path="url(#courtclip)">${marks}</g></svg>`;
+  }
+  function zoneTable(season, rec, lg) {
+    const L = (lg && lg.seasons[season]) || { scheme: "full", zones: {} };
+    const keys = SCHEME_ZONES[L.scheme] || SCHEME_ZONES.full;
+    const { z, tot } = zoneStats((rec.zones || {})[season] || {}, L.zones || {}, keys);
+    if (!tot) return `<p class="muted">No play-by-play shots for this season.</p>`;
+    const rows = keys.map((k) => { const s = z[k]; return `<tr><td class="l wrap"><span class="zdot" style="background:${zoneFill(s.d)}"></span>${esc(ZONE_INFO[k][0])}<div class="small faint hide-sm">${esc(ZONE_INFO[k][1])}</div></td>
+      <td class="num">${s.m}/${s.a}</td><td class="num"><b>${isNum(s.fg) ? fmt(s.fg) : "–"}</b></td><td class="num faint">${isNum(s.lfg) ? fmt(s.lfg) : "–"}</td>
+      <td class="num ${isNum(s.d) ? (s.d >= 0 ? "pos" : "neg") : "faint"}">${isNum(s.d) ? sgn(s.d) : "–"}</td><td class="num">${(100 * s.share).toFixed(0)}%<span class="faint small hide-sm"> / ${(100 * s.lshare).toFixed(0)}%</span></td></tr>`; }).join("");
+    return `<div class="tbl-wrap"><table class="zones"><thead><tr><th class="l nosort">Zone</th><th class="nosort">FGM/A</th><th class="nosort">FG%</th><th class="nosort" title="League FG% from this zone">Lg</th><th class="nosort" title="FG% minus the league's, in points">+/−</th><th class="nosort" title="Share of ${his} attempts / the league's">Diet</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  function careerTable(rows, cur) {
+    if (!rows || !rows.length) return `<p class="muted">No season lines yet.</p>`;
+    const valLab = ESPN_ONLY ? "Value" : "BPM";
+    const cols = [["g", "G", 0], ["mpg", "MPG", 1], ["ppg", "PTS", 1], ["rpg", "REB", 1], ["apg", "AST", 1], ["spg", "STL", 1], ["bpg", "BLK", 1],
+      ["fg", "FG%", 1], ["tp", "3P%", 1], ["tpa", "3PA", 1, "Threes attempted per game"], ["ft", "FT%", 1], ["ts", "TS%", 1, "True shooting"]]
+      .concat(ESPN_ONLY ? [] : [["usg", "Usg%", 1, "Usage rate (Torvik)"]])
+      .concat([["val", valLab, 1, ESPN_ONLY ? `Season box plus/minus from hoop2vec's game values (points per 100 vs an average ${LG} player), before the prior` : "Torvik's box plus/minus for the season (points per 100 vs an average D-I player)"]]);
+    const body = rows.slice().reverse().map((r) => `<tr><td class="l">${seasonLabel(r.season)}${r.season === cur ? ` <span class="faint small">so far</span>` : ""}</td>
+      <td class="l">${TEAMS[r.team] ? teamLink(r.team) : esc(r.team || "")}</td>${IS_PRO ? "" : `<td class="faint">${esc(r.cls || "")}</td>`}
+      ${cols.map(([k, , d]) => `<td class="num">${k === "val" ? sgn(r[k], d) : fmt(r[k], d)}</td>`).join("")}</tr>`).join("");
+    // career per-game averages, weighted by games (minutes for MPG-weighted rates)
+    const G = rows.reduce((s, r) => s + (r.g || 0), 0);
+    const wavg = (k, w = (r) => r.g || 0) => { let n = 0, d = 0; rows.forEach((r) => { if (isNum(r[k])) { n += w(r) * r[k]; d += w(r); } }); return d ? n / d : null; };
+    const totals = rows.length > 1 ? `<tr class="total"><td class="l"><b>Career</b></td><td class="l faint small">${rows.length} seasons</td>${IS_PRO ? "" : "<td></td>"}
+      ${cols.map(([k, , d]) => `<td class="num">${k === "g" ? G : ["fg", "tp", "ft", "ts", "usg"].includes(k) ? "" : k === "val" ? sgn(wavg(k, (r) => (r.g || 0) * (r.mpg || 0)), d) : fmt(wavg(k), d)}</td>`).join("")}</tr>` : "";
+    return `<div class="tbl-wrap"><table class="career"><thead><tr><th class="l nosort">Season</th><th class="l nosort">Team</th>${IS_PRO ? "" : `<th class="nosort">Yr</th>`}${cols.map(([, l, , t]) => `<th class="nosort" title="${esc(t || "")}">${l}</th>`).join("")}</tr></thead><tbody>${body}${totals}</tbody></table></div>`;
+  }
+  async function viewPlayer(slug, params, pidArg) {
+    const [d] = await Promise.all([get("players.json"), teams()]);
+    const pid = Number(pidArg);
+    const p = d.players.find((x) => x.pid === pid && slugify(x.team) === slug) || d.players.find((x) => x.pid === pid);
+    const [shard, lg] = await Promise.all([get(`players/${slug}.json`, true), get("shots_league.json", true)]);
+    const rec = (shard && shard.players[String(pid)]) || { career: [], zones: {}, shots: {} };
+    if (!p && !rec.career.length) { app.innerHTML = `<div class="card">Player not found. <a href="#/players">All players</a></div>`; return; }
+    const name = p ? p.name : `Player ${pid}`, team = p ? p.team : (shard && shard.team);
+    document.title = [name, team, "hoop2vec"].filter(Boolean).join(" · ");
+    const t = TEAMS[team];
+    const color = t && t.color && /^[0-9a-f]{6}$/i.test(t.color) && t.color.toLowerCase() !== "ffffff" ? `#${t.color}` : "var(--accent)";
+    const stat = (k, v, r = "") => `<div class="tile"><span class="k">${k}</span><span class="v num">${v}</span><span class="r">${r}</span></div>`;
+    const tiles = p ? [
+      stat("Value", sgn(p.value), p.value_rank ? `#${p.value_rank} · per 100 vs avg ${LG}` : `per 100 vs avg ${LG}`),
+      stat("Impact", sgn(p.impact), p.impact_rank ? `#${p.impact_rank} · team pts per 100` : "team pts per 100"),
+      stat("Points", fmt(p.ppg), "per game"), stat("Rebounds", fmt(p.rpg), "per game"), stat("Assists", fmt(p.apg), "per game"),
+      stat("True shooting", fmt(p.ts), `${fmt(p.fg_pct)} FG% · ${fmt(p.tp_pct)} 3P%`), stat("Minutes", fmt(p.mpg), `${p.g} games`),
+      stat("Availability", isNum(p.avail) ? pct(p.avail) : "–", "chance to play next game"),
+    ].join("") : "";
+    const seasons = [...new Set([...Object.keys(rec.zones || {}), ...Object.keys(rec.shots || {})])].map(Number).sort((a, b) => b - a);
+    let season = Number(params.get("season")) || seasons[0];
+    if (!seasons.includes(season)) season = seasons[0];
+    let mode = params.get("view") === "zones" ? "zones" : "loc";
+    const bio = p ? [p.pos, htFmt(p.ht), IS_PRO ? (p.cls ? (p.cls === "R" ? "Rookie" : `Year ${p.cls}`) : "") : p.cls, p.role, p.conf].filter(Boolean) : [];
+    app.innerHTML = `
+      <div class="card" style="background:linear-gradient(120deg, color-mix(in srgb, ${color} 22%, var(--surface)), var(--surface) 55%)">
+        <div class="team-hero">${logo(t, "lg")}<div class="meta"><h1>${esc(name)}</h1>
+          <div class="badges">${team ? `<a class="pill acc" href="#/team/${slugify(team)}">${esc(team)}</a>` : ""}${bio.map((b) => `<span class="pill">${esc(b)}</span>`).join("")}${p && p.status ? `<span class="pill bad">✚ ${esc(p.status)}</span>` : ""}</div></div>
+          <a href="#/players${team ? `?team=${encodeURIComponent(team)}` : ""}">All ${esc(team || "")} players →</a></div>
+      </div>
+      ${tiles ? `<div class="section tiles">${tiles}</div>` : ""}
+      <div class="section grid g2 top">
+        <div class="card"><div class="chart-head"><h2>Shot chart</h2><div class="controls">
+          ${seasons.length ? `<select id="shseason" aria-label="Season">${seasons.map((s) => `<option value="${s}" ${s === season ? "selected" : ""}>${seasonLabel(s)}</option>`).join("")}</select>` : ""}
+          <span id="shmode"></span></div></div>
+          <div id="shchart"></div><p class="note" id="shnote"></p></div>
+        <div class="card"><h2>By zone</h2><div id="shzones"></div>
+          <p class="note">From ESPN play-by-play, ${IS_PRO ? "regular season and playoffs" : "every game"}. Lg = the ${LG} average from that zone that season; Diet = share of ${his} shots / the league's. +/− needs 5+ attempts.</p></div>
+      </div>
+      <div class="section card flush"><div style="padding:16px 20px 6px"><h2>Career</h2>
+        <p class="note" style="margin-top:-4px">${ESPN_ONLY ? `Per-game averages from ESPN box scores (${IS_PRO ? `${LEAGUE.toUpperCase()} since 2008, regular season and playoffs` : "since 2018–19"}).` : "Every D-I season since 2007–08, from barttorvik.com's player tables."} A player who changed teams mid-season has a line for each team.</p></div>
+        ${careerTable(rec.career, d.season)}</div>`;
+    const draw = () => {
+      const has = rec.shots && rec.shots[season];
+      if (!has && mode === "loc") mode = "zones";
+      $("#shmode").innerHTML = has ? seg("shm", [["loc", "Locations"], ["zones", "Zones"]], mode) : "";
+      if (has) onSeg("shm", (v) => { mode = v; draw(); });
+      $("#shchart").innerHTML = seasons.length ? shotChart(String(season), mode, rec, lg) : `<p class="muted">No play-by-play shots yet.</p>`;
+      $("#shzones").innerHTML = seasons.length ? zoneTable(String(season), rec, lg) : `<p class="muted">No play-by-play shots yet.</p>`;
+      const L = lg && lg.seasons[String(season)];
+      $("#shnote").innerHTML = !seasons.length ? "" : (mode === "loc" && has
+        ? `Each dot is a one-foot spot on the floor: bigger = more attempts. Color = ${his} FG% in that zone vs the ${LG} average (blue above, red below, ±10 points at full color).`
+        : `Zones colored by ${his} FG% vs the ${LG} average from there (blue above, red below, ±10 points at full color).`)
+        + (L && L.scheme !== "full" ? ` ESPN didn't record ${L.scheme === "coarse" ? "shot distances or locations" : "court locations"} this season, so zones are broader.` : "")
+        + (!has && L && L.scheme === "full" ? " Exact spots weren't kept for this season, so the chart shows zones." : "");
+    };
+    draw();
+    const sel = $("#shseason");
+    if (sel) sel.addEventListener("change", () => { season = Number(sel.value); mode = "loc"; draw(); });
+  }
 
   // ================================================================ PRO (NBA / WNBA) PROSPECTS
   const MONTH = IS_W ? "April" : "June";
@@ -680,7 +852,7 @@
       const pre = g.played && isNum(g.p) ? `<span class="faint small">pre-game ${pct(g.p)}</span>` : isNum(g.margin) && !g.played ? `<span class="faint small">${sgn(g.margin)}</span>` : "";
       return `<tr><td class="l faint">${g.date.slice(5)}</td><td class="l faint">${locWord(g.loc)}</td><td class="l">${opp ? teamLink(g.opp, opp) : esc(g.opp)}</td><td>${res}</td><td class="hide-sm">${pre}</td></tr>`;
     }).join("");
-    const roster = d.roster.map((p) => `<tr><td class="l wrap"><b>${esc(p.player)}</b>${p.status ? `<div class="small"><span class="pill bad">✚ ${esc(p.status)}</span></div>` : ""}</td>
+    const roster = d.roster.map((p) => `<tr><td class="l wrap">${playerLink({ name: p.player, pid: p.pid, team: name })}${p.status ? `<div class="small"><span class="pill bad">✚ ${esc(p.status)}</span></div>` : ""}</td>
       <td class="faint">${esc(p.cls || "")}</td><td class="faint hide-sm">${p.inches ? `${Math.floor(p.inches / 12)}'${Math.round(p.inches % 12)}"` : ""}</td>
       <td class="num">${fmt(p.mpg)}</td><td class="num"><b>${sgn(p.value)}</b></td><td class="num hide-sm">${sgn(p.o)}</td><td class="num hide-sm">${sgn(p.d)}</td>
       <td class="num">${isNum(p.avail) ? pct(p.avail) : ""}</td></tr>`).join("");

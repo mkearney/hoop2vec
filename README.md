@@ -52,6 +52,17 @@ hoop2vec merges two earlier projects. Where they overlapped, the better piece wa
   prior-shrunk box plus/minus (points per 100 possessions vs an average D-I player). **Impact** = minutes share ×
   (value − replacement), i.e. what the player adds to the team's rating. Each player also gets availability, ESPN per-game box stats
   and Torvik's advanced rates. The site defaults to rotation players (3+ games, 15+ mpg) and can show everyone.
+* **Player pages** (`#/player/<team>/<pid>`, `hoop2vec/careers.py`): every player in the Players table gets a career
+  table and a shot chart. The data is one file per team (`docs/<league>/data/players/<team>.json`), so a page loads only
+  its own team's file. Career lines come from Torvik's player-season tables for men's college (every D-I season since
+  2008) and from ESPN box scores for everyone else (women's college since 2019, NBA and WNBA since 2008, playoffs
+  included). Shot zones come from ESPN play-by-play, compared with the league average from the same zone that season
+  (`shots_league.json`). ESPN's tagging changes over time, so each season uses the finest zones its data allows: rim /
+  short mid / long mid / corner 3 / above-the-break 3 when ESPN gave court locations (every pro season since 2008 except the 2020 WNBA bubble; college from
+  2025–26), rim / short / long / 3 with only shot distances, and rim / other 2s / 3 with neither (college before
+  2025–26). The ingest now also keeps each located shot (ESPN's x, y in feet), so the chart can show exact spots
+  for up to the last 5 seasons. The daily job fills in the current season by itself. Past seasons can be backfilled
+  with `python -m hoop2vec shots <seasons>` or the `backfill-shots` workflow.
 
 ## NBA prospects
 
@@ -255,6 +266,7 @@ python -m hoop2vec all        # train + backtest + publish
 python -m hoop2vec publish    # re-export the site from cached features (fast)
 python -m hoop2vec history    # after a season ends: refresh the committed history/ bundle
 python -m hoop2vec ingest 2015-2026   # play-by-play for past seasons (only needed to refit identities)
+python -m hoop2vec shots 2022-2026    # one-time backfill of shot locations for past seasons (player shot charts)
 python -m hoop2vec style      # refit the team-identity model from the play-by-play seasons
 python -m hoop2vec site       # rewrite the page shells (docs/index.html chooser + docs/<league>/index.html)
 
@@ -283,6 +295,7 @@ To preview locally: `cd docs && python -m http.server`.
 
 * `.github/workflows/daily.yml`: every morning, all four leagues in turn (a league out of season has nothing new).
 * `.github/workflows/retrain.yml`: monthly retrain + backtest for every league, or on demand.
+* `.github/workflows/backfill-shots.yml`: on demand, backfill past seasons' shot locations for one league and re-publish.
 
 Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
 
@@ -296,7 +309,8 @@ hoop2vec/            python package
   playoffs.py        NBA / WNBA: season simulation, tiebreakers, play-in, best-of-N series, series backtest
   games.py           games table, Torvik<->ESPN crosswalk, venues, NCAA rounds/seeds
   espn_fallback.py   current season from ESPN when Torvik is unreachable
-  ingest.py          ESPN play-by-play ingest (box score, PBP counts, lineups, closing line)
+  ingest.py          ESPN play-by-play ingest (box score, PBP counts, lineups, shot locations, closing line)
+  careers.py         player pages: career lines, shot zones and shot locations per team
   ratings/           efficiency.py (ridge snapshots), kalman.py (dynamic), elo.py
   players.py         player values (de-leaked), roster strength, availability
   features.py        leak-free per-game modelling table

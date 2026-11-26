@@ -1,0 +1,70 @@
+name: backfill-shots
+
+# One-time backfill of shot locations (player shot charts) for seasons ingested before the ingest kept them.
+# The daily job already does the current season; this re-fetches past seasons' ESPN game summaries once, keeps only
+# their shots, then re-publishes the site. Player pages show the last 5 seasons of locations, so older seasons
+# add nothing to the charts.
+
+on:
+  workflow_dispatch:
+    inputs:
+      league:
+        description: League
+        type: choice
+        options: [nba, wnba, mens, womens]
+        default: nba
+      seasons:
+        description: "Seasons, e.g. 2022-2026 (season = the year it ends)"
+        type: string
+        default: "2022-2026"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hoop2vec-refresh
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      LEAGUE: ${{ inputs.league }}
+      SEASONS: ${{ inputs.seasons }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Check inputs
+        run: '[[ "$SEASONS" =~ ^[0-9]{4}(-[0-9]{4})?$ ]] || { echo "seasons must look like 2022-2026"; exit 1; }'
+      - name: Install
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Restore data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/${{ inputs.league }}
+          key: hoop2vec-data-${{ inputs.league }}-${{ github.run_id }}
+          restore-keys: hoop2vec-data-${{ inputs.league }}-
+      - name: Backfill shot locations
+        run: python -m hoop2vec shots "$SEASONS" "--$LEAGUE"
+      - name: Save data cache (even if a later step fails)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/${{ inputs.league }}
+          key: hoop2vec-data-${{ inputs.league }}-${{ github.run_id }}
+      - name: Re-publish the site
+        run: python -m hoop2vec publish "--$LEAGUE"
+      - name: Commit results
+        run: |
+          git config user.name "Michael W. Kearney"
+          git config user.email "13401460+mkearney@users.noreply.github.com"
+          git add docs
+          git diff --cached --quiet || git commit -m "Backfill shot locations ($LEAGUE $SEASONS)"
+          git pull --rebase --autostash
+          git push

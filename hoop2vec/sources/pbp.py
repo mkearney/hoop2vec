@@ -5,6 +5,7 @@ Each game summary is parsed on the fly into compact rows (we never keep the raw 
   - team_games:   one row per team per game (box score + play-by-play derived counts)
   - player_games: one row per player per game (box score + PBP shot diet + on-court stints)
   - lineups:      seconds / possessions / points per 5-man lineup per game
+  - shots:        one row per field-goal attempt with an ESPN court location (x, y in feet; player shot charts)
 """
 from __future__ import annotations
 
@@ -113,7 +114,7 @@ def shot_info(p: dict) -> dict:
     else:
         zone = "lmid"
     return dict(
-        three=three, dist=dist, kind=kind, zone=zone,
+        three=three, dist=dist, kind=kind, zone=zone, x=x, y=y,
         pullup="pullup" in t or "pull up" in t, stepback="step back" in t,
         turnaround=("turnaround" in t or "fadeaway" in t), driving="driving" in t,
         floater="floating" in t or "floater" in t, alleyoop="alley oop" in t,
@@ -241,16 +242,16 @@ def parse_summary(js: dict, season: int):
     pbp_ok = len(plays) > 150
     pf = _parse_pbp(plays, hid, aid, opp, starters, pinfo, game) if pbp_ok else None
     game["pbp"] = pbp_ok
-    lineups = []
+    lineups, shots = [], []
     if pf:
-        tcounts, pcounts, lineups, meta = pf
+        tcounts, pcounts, lineups, meta, shots = pf
         game.update(meta)
         for tid in tg:
             tg[tid].update({f"p_{k}": v for k, v in tcounts[tid].items()})
         for pid, d in pcounts.items():
             if pid in players:
                 players[pid].update({f"p_{k}": v for k, v in d.items()})
-    return game, list(tg.values()), list(players.values()), lineups
+    return game, list(tg.values()), list(players.values()), lineups, shots
 
 
 def _parse_pbp(plays, hid, aid, opp, starters, pinfo, game):
@@ -266,6 +267,7 @@ def _parse_pbp(plays, hid, aid, opp, starters, pinfo, game):
     last_t, cur_period = 0.0, 1
     last_orb_t = {hid: -99, aid: -99}
     n_shots = n_sync = 0
+    shots = []  # located field-goal attempts (x across the court, y from the basket, in feet)
     poss_lengths = {hid: [], aid: []}
 
     def lkey(tid):
@@ -375,6 +377,9 @@ def _parse_pbp(plays, hid, aid, opp, starters, pinfo, game):
                 start_poss(tid, t, "unknown")
             s = shot_info(p)
             made = bool(p.get("scoringPlay"))
+            if actor and s["x"] is not None:
+                shots.append(dict(game_id=game["game_id"], team_id=tid, athlete_id=actor, x=int(round(s["x"])),
+                                  y=int(round(s["y"])), made=made, zone=s["zone"]))
             since_start = t - t0
             since_reset = t - reset_t
             timed = trig not in ("unknown", "period") or since_start < 40
@@ -519,4 +524,4 @@ def _parse_pbp(plays, hid, aid, opp, starters, pinfo, game):
             lineups.append(dict(game_id=game["game_id"], season=game["season"], team_id=tid,
                                 lineup="|".join(k), **d))
     meta = dict(pbp_shots=n_shots, pbp_resync=n_sync)
-    return T, P, lineups, meta
+    return T, P, lineups, meta, shots

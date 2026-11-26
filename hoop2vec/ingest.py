@@ -1,8 +1,12 @@
 """Incrementally ingest ESPN game summaries (box score + play-by-play + closing line) for one season.
 
 Each summary is parsed on the fly into compact tables under data/processed/pbp/<season>/ (raw JSON is
-never kept): games, team_games, player_games, lineups. Completed seasons only need this once (to build the
+never kept): games, team_games, player_games, lineups, shots. Completed seasons only need this once (to build the
 style tables in artifacts/style/); the daily job fetches just the new games of the current season.
+
+``shots`` (located field-goal attempts for player shot charts) came later than the other tables. ``shot_games``
+lists the games whose summaries were parsed with it, so games ingested before it can be fetched again once for their
+shots: automatically for the current season, and with ``python -m hoop2vec shots 2008-2026`` for past ones.
 """
 from __future__ import annotations
 
@@ -15,7 +19,8 @@ import pandas as pd
 from .config import PROC, RAW, current_season, today
 from .sources.pbp import BASE, get_json, parse_summary, scoreboard, season_dates
 
-TABLES = ("games", "team_games", "player_games", "lineups")
+TABLES = ("games", "team_games", "player_games", "lineups", "shots", "shot_games")
+SHOT_TABLES = ("shots", "shot_games")
 PBP = PROC / "pbp"
 
 
@@ -58,8 +63,11 @@ def _fetch(gid: str, season: int):
         return None
 
 
-def ingest_season(season: int, workers: int = 8, refresh_recent: bool | None = None):
+def ingest_season(season: int, workers: int = 8, refresh_recent: bool | None = None, shots: bool | None = None):
+    """Fetch this season's new completed games. ``shots`` (default: current season only) also fetches, once, the
+    games ingested before shot locations were kept, and stores only their shots."""
     refresh_recent = season >= current_season() if refresh_recent is None else refresh_recent
+    shots = season >= current_season() if shots is None else shots
     t0 = time.time()
     sched = load_schedule(season, refresh_recent)
     sched = sched[sched["completed"].astype(bool)]
@@ -71,9 +79,14 @@ def ingest_season(season: int, workers: int = 8, refresh_recent: bool | None = N
     out = season_dir(season)
     out.mkdir(parents=True, exist_ok=True)
     existing = {t: pd.read_parquet(out / f"{t}.parquet") if (out / f"{t}.parquet").exists() else None for t in TABLES}
-    done = set(existing["games"]["game_id"]) if existing["games"] is not None else set()
+    done = set(existing["games"]["game_id"].astype(str)) if existing["games"] is not None else set()
     todo = [g for g in sched["game_id"] if g not in done]
-    print(f"[pbp {season}] {len(sched)} completed games, {len(todo)} to fetch", flush=True)
+    redo = []
+    if shots and done:
+        have = set(existing["shot_games"]["game_id"].astype(str)) if existing["shot_games"] is not None else set()
+        redo = sorted(done - have)
+    print(f"[pbp {season}] {len(sched)} completed games, {len(todo)} to fetch"
+          + (f", {len(redo)} to re-fetch for shot locations" if redo else ""), flush=True)
     acc = {t: [] for t in TABLES}
     n = 0
 
@@ -88,21 +101,26 @@ def ingest_season(season: int, workers: int = 8, refresh_recent: bool | None = N
             existing[t] = df
             acc[t] = []
 
+    jobs = [(g, False) for g in todo] + [(g, True) for g in redo]
     with ThreadPoolExecutor(workers) as ex:
-        futs = {ex.submit(_fetch, g, season): g for g in todo}
+        futs = {ex.submit(_fetch, g, season): (g, shots_only) for g, shots_only in jobs}
         for fu in as_completed(futs):
+            gid, shots_only = futs[fu]
             r = fu.result()
             if r is None:
                 continue
-            g, tg, pg, lu = r
-            acc["games"].append(g)
-            acc["team_games"] += tg
-            acc["player_games"] += pg
-            acc["lineups"] += lu
+            g, tg, pg, lu, sh = r
+            if not shots_only:
+                acc["games"].append(g)
+                acc["team_games"] += tg
+                acc["player_games"] += pg
+                acc["lineups"] += lu
+            acc["shots"] += sh
+            acc["shot_games"].append({"game_id": str(g["game_id"])})
             n += 1
             if n % 1000 == 0:
                 flush()
-                print(f"  [pbp {season}] {n}/{len(todo)} ({time.time() - t0:.0f}s)", flush=True)
+                print(f"  [pbp {season}] {n}/{len(jobs)} ({time.time() - t0:.0f}s)", flush=True)
     flush()
-    print(f"[pbp {season}] {n} new games in {time.time() - t0:.0f}s", flush=True)
+    print(f"[pbp {season}] {n} games fetched in {time.time() - t0:.0f}s", flush=True)
     return n

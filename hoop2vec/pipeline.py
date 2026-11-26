@@ -347,7 +347,13 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     write_team_pages(st, snaps, season, live, pg, inj_report, gcur, feat, bundle, up)
 
     log("players")
-    write_players(st, live, pg, inj_report, season)
+    pdf = write_players(st, live, pg, inj_report, season)
+    log("player pages (careers, shot zones, shot locations)")
+    try:
+        from . import careers
+        log(f"  {careers.publish(pdf, season)} players")
+    except Exception as e:  # player pages are optional for the rest of the site
+        log(f"  player pages skipped: {e!r}")
 
     if PRO_LEAGUE:
         log("playoffs (season simulation, play-in, series)")
@@ -576,6 +582,7 @@ def write_players(st, live, pg, inj_report, season):
                                 "players": [{k: _clean(v) for k, v in rec.items() if _clean(v) is not None}
                                             for rec in df.to_dict(orient="records")]})
     log(f"  {len(df)} players")
+    return df
 
 
 def write_team_pages(st, snaps, season, live, pg, inj_report, gcur, feat, bundle, up):
@@ -612,7 +619,7 @@ def write_team_pages(st, snaps, season, live, pg, inj_report, gcur, feat, bundle
                     r_ = r_.iloc[0] if isinstance(r_, pd.DataFrame) else r_
                     if r_["team"] == t:
                         status = f"{r_['status']} ({r_['injury']})" if r_["injury"] else r_["status"]
-                roster.append({"player": nm, "cls": _clean(names["cls"].get(p.pid)), "inches": _clean(names["inches"].get(p.pid)),
+                roster.append({"player": nm, "pid": int(p.pid), "cls": _clean(names["cls"].get(p.pid)), "inches": _clean(names["inches"].get(p.pid)),
                                "value": _clean(p.value), "o": _clean(p.o_value), "d": _clean(p.d_value),
                                "mpg": _clean(p.minutes / max(p.games, 1)), "games": int(p.games), "share": _clean(p.share),
                                "avail": _clean(p.avail), "status": status})
