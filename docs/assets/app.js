@@ -435,7 +435,12 @@
     const [d] = await Promise.all([get("prospects.json"), teams()]);
     const P = d.players;
     const { tierKey, tierLab } = prospectViews(d);
-    const FR_KEY = tierKey[tierLab.indexOf("1st round")];  // men: top 30; women: top 12
+    // projected draft order = expected draft value (same as prospects.py draft_value): each tier's probability times
+    // the average value of its picks on a steep pick-value curve, so the likeliest high picks come first
+    const T = d.thresholds || [5, 14, 30, 60], vs = (4 * T[T.length - 1]) / 60, val = (k) => 1 / (1 + (k - 1) / vs);
+    const tierVal = T.map((t, i) => { const lo = i ? T[i - 1] : 0; let a = 0; for (let k = lo + 1; k <= t; k++) a += val(k); return a / (t - lo); });
+    P.forEach((p) => { if (!isNum(p.draft_value)) p.draft_value = T.reduce((s, t, i) => s + (p["p" + t] - (i ? p["p" + T[i - 1]] : 0)) * tierVal[i], 0); });
+    P.slice().sort((a, b) => b.draft_value - a.draft_value).forEach((p, i) => { p.board = i + 1; });
     XD = { window: d.window, first: d.pro_first || 2009, last: d.pro_last || 2026 };
     const confs = [...new Set(P.map((p) => p.conf).filter(Boolean))].sort();
     // each board is ranked by the number it shows (ties: overall draft score)
@@ -443,11 +448,19 @@
         <div class="odds-row lb-row"><span class="faint num">${i + 1}</span>
           <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm lb-nm"><b>${esc(p.name)}</b><span class="faint small">${esc(p.cls || "")} · ${esc(p.team)}</span></span></span>
           <div class="pbar lb-bar"><span style="width:${(100 * p[key] / Math.max(...P.map((x) => x[key]))).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${fmtv(p)}</div></div>`).join("")}</div>`;
+    // projected draft order, with the three tier probabilities that explain it
+    const tiers = [0, 1, 2];
+    const draftBoard = () => `<div class="card"><h2>Projected draft order</h2><p class="note" style="margin-top:-4px">College players ranked by where they're likeliest to be picked this ${MONTH}, weighting high picks most. Columns: chance of going in each range.</p>
+        <div class="odds-row db-row db-head"><span></span><span></span>${tiers.map((i) => `<span class="num">${tierLab[i].replace("1st round", "1st rd")}</span>`).join("")}</div>
+        ${P.slice().sort((a, b) => a.board - b.board).slice(0, 10).map((p) => `
+        <div class="odds-row db-row"><span class="faint num">${p.board}</span>
+          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm lb-nm"><b>${esc(p.name)}</b><span class="faint small">${esc(p.cls || "")} · ${esc(p.team)}</span></span></span>
+          ${tiers.map((i) => `<span class="num db-p${i === 0 ? " lead" : ""}">${pct(p[tierKey[i]])}</span>`).join("")}</div>`).join("")}</div>`;
     const bt = d.backtest;
     app.innerHTML = `
       <div class="page-head"><div><h1>${d.draft_year} ${PRO} Prospects</h1>
         <p class="sub">Two models built on every D-I player-season since ${d.train ? d.train.first || (IS_W ? 2019 : 2008) : IS_W ? 2019 : 2008}. The <b>draft model</b> predicts where college players will be picked this ${MONTH}. The <b>success model</b> predicts whether a player becomes an established ${PRO} rotation player: ${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons. Both are trained only on completed seasons and checked out-of-sample against real drafts and real ${PRO} careers. ${IS_W ? "College players only: international prospects aren't modeled. The WNBA has only 36 picks and 144 roster spots, so even very good college players often don't stick; the women's history is also shorter (box scores since 2019), so these models are less certain than the men's." : "College players only: international and G League prospects aren't modeled, so board slots run ahead of real picks. Early in the season, ratings lean on last season and recruiting."}</p></div></div>
-      <div class="grid g2">${board(FR_KEY, "Likeliest first-rounders", `P(picked in the first round this ${MONTH})`, (p) => pct(p[FR_KEY]))}
+      <div class="grid g2">${draftBoard()}
         ${board("p_success", `Best ${PRO} bets`, `P(${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons)`, (p) => pct(p.p_success))}</div>
       <div class="section controls">
         <input type="search" id="xq" placeholder="Search prospects or teams…" style="width:230px" value="${esc(XF.q)}" aria-label="Search prospects">

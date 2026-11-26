@@ -449,3 +449,9 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 /* prospect boards: name on one line, class · school under it */
 .lb-nm { display: flex; flex-direction: column; line-height: 1.25; max-width: none !important; }
 .lb-nm b, .lb-nm .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* projected draft order: rank, player, three tier probabilities */
+.db-row { grid-template-columns: 22px minmax(0, 1fr) repeat(3, 52px) !important; }
+.db-head span { font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; text-align: right; white-space: nowrap; }
+.db-p { text-align: right; color: var(--text-2); }
+.db-p.lead { color: var(--text); font-weight: 600; }
+@media (max-width: 640px) { .db-row { grid-template-columns: 20px minmax(0, 1fr) repeat(3, 44px) !important; gap: 6px; } .db-head span { font-size: 10px; letter-spacing: 0; } }

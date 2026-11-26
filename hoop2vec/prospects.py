@@ -61,6 +61,22 @@ if WOMENS:  # no free birth dates or recruiting ranks for women's college player
 
 
 # ------------------------------------------------------------------ data
+
+
+def draft_value(df):
+    """Projected draft order: the probability-weighted value of where a player lands, on a steep pick-value curve
+    (pick 1 = 1, pick 5 ~ .5, pick 14 ~ .2, last pick ~ .05, undrafted = 0; scaled to the draft's length).
+    Unlike draft_score (the plain sum of the cumulative tier probabilities, kept for the backtests), it puts the
+    likeliest high picks first. app.js computes the same thing for older prospects.json files."""
+    import numpy as np
+    s = 4 * THRESHOLDS[-1] / 60
+    val = lambda k: 1 / (1 + (k - 1) / s)  # noqa: E731
+    out, lo, prev = np.zeros(len(df)), 0, 0
+    for t in THRESHOLDS:
+        c = df[f"p{t}"].to_numpy()
+        out += (c - prev) * np.mean([val(k) for k in range(lo + 1, t + 1)])
+        lo, prev = t, c
+    return out
 def college(seasons=None, refresh_current: bool = False) -> pd.DataFrame:
     """Torvik player-season tables: committed history for completed seasons + live file for the current one.
     Women's: the same columns built from ESPN box scores, with WNBA draft picks attached."""
@@ -672,7 +688,8 @@ def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
         z = np.log(cur["p_success"].clip(1e-5, 1 - 1e-5) / (1 - cur["p_success"].clip(1e-5, 1 - 1e-5)))
         cur["p_success"] = 1 / (1 + np.exp(-(platt["a"] + platt["b"] * z)))
         cur["p_star"] = np.minimum(cur["p_star"], cur["p_success"])
-    cur["board"] = cur["draft_score"].rank(ascending=False, method="first").astype(int)
+    cur["draft_value"] = draft_value(cur)
+    cur["board"] = cur["draft_value"].rank(ascending=False, method="first").astype(int)
     cur["succ_rank"] = cur["p_success"].rank(ascending=False, method="first").astype(int)
     show = cur[(cur["board"] <= n_board) | (cur["succ_rank"] <= 200)].sort_values("board")
     hist = T[T["final"] & T["drafted"] & T["mature"].fillna(False).astype(bool)]
@@ -691,7 +708,7 @@ def publish(T, write_json, season=None, n_board=400, nba=None, link=None):
             "pts": r.pts_pg, "reb": r.trb_pg, "ast": r.ast_pg, "stl": r.stl_pg, "blk": r.blk_pg, "bpm": r.bpm_raw,
             "obpm": r.obpm, "dbpm": r.dbpm, "usg": r.usg_raw, "ts": r.ts_raw, "ast_pct": r.ast_pct, "to_pct": r.to_pct,
             "blk_pct": r.blk_pct, "stl_pct": r.stl_pct, "tp_pct": (100 * r.tpm / r.tpa) if r.tpa else None, "tpa": r.tpa / max(r.gp, 1),
-            "board": int(r.board), "succ_rank": int(r.succ_rank), "draft_score": r.draft_score, **{f"p{k}": r[f"p{k}"] for k in THRESHOLDS},
+            "board": int(r.board), "succ_rank": int(r.succ_rank), "draft_score": r.draft_score, "draft_value": r.draft_value, **{f"p{k}": r[f"p{k}"] for k in THRESHOLDS},
             "p_success": r.p_success, "p_star": r.p_star, "exp_ws": r.exp_ws, **c})
     hist_rates = {}
     tiers = list(zip((1,) + tuple(t + 1 for t in THRESHOLDS[:-1]), THRESHOLDS))
