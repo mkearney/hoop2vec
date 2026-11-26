@@ -2,7 +2,7 @@ name: daily-refresh
 
 on:
   schedule:
-    - cron: "23 10 * * *"   # ~5-6am ET, every day (college Nov-Apr, NBA Oct-Jun, WNBA May-Oct; idle leagues exit early)
+    - cron: "23 10 * * *"    # ~5-6am ET, every day (college Nov-Apr, NBA Oct-Jun, WNBA May-Oct; idle leagues exit early)
   workflow_dispatch:
 
 permissions:

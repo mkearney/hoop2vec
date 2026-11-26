@@ -6,7 +6,7 @@ name: live-refresh
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/10 * * * *"   # every 10 minutes (GitHub may start runs a few minutes late)
   workflow_dispatch:
     inputs:
       force:
