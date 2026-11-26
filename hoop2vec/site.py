@@ -18,6 +18,9 @@ ICON = ("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0
         "<path d='M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44' stroke='%23111' stroke-width='3' fill='none'/></svg>")
 FONTS_CSS = ("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500"
              "&display=swap")
+# Cloudflare Web Analytics: cookieless page-view counts (dash.cloudflare.com > Analytics & Logs > Web Analytics).
+ANALYTICS = ("<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' "
+             "data-cf-beacon='{\"token\": \"203a51614dc84183b570be1615329ed5\"}'></script>")
 
 
 ABOUT = {"mens": "NCAA Division I men's basketball", "womens": "NCAA Division I women's basketball",
@@ -95,6 +98,7 @@ def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp:
   <link href="{FONTS_CSS}" rel="stylesheet">
   <link rel="stylesheet" href="{root}assets/style.css">
   <script type="application/ld+json" id="ld">{json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")}</script>
+  {ANALYTICS}
 </head>
 '''
 
