@@ -236,7 +236,7 @@ td.wrap { white-space: normal; }
 .slider .pt.r { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; background: var(--hot); border-width: 1.5px; }
 .slider .pct { font-size: 12px; color: var(--text-2); }
 .slider .poles { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); margin-top: 3px; gap: 8px; }
-.slider.strong .lab b::after { content: " ●"; color: var(--hot); font-size: 9px; vertical-align: middle; }
+.slider.strong .lab b::after { content: " ★"; color: var(--hot); font-size: 11px; vertical-align: 1px; }
 ul.clean { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 ul.clean li { padding-left: 22px; position: relative; font-size: 13.5px; }
 ul.clean li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
@@ -438,3 +438,14 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .js .crawl { display: none; }
 .crawl table { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
 .crawl th, .crawl td { padding: 3px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+/* style-slider legend: the same marks as the sliders */
+.slider-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-3); margin: -2px 0 12px; }
+.slider-key span { display: inline-flex; align-items: center; gap: 6px; }
+.slider-key i { display: inline-block; flex: none; }
+.slider-key .k-pt { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+.slider-key .k-pt.r { width: 8px; height: 8px; background: var(--hot); }
+.slider-key .k-band { width: 18px; height: 6px; border-radius: 3px; background: var(--accent-soft); }
+.slider-key .k-sig { font-style: normal; color: var(--hot); font-size: 12px; line-height: 1; }
+/* prospect boards: name on one line, class · school under it */
+.lb-nm { display: flex; flex-direction: column; line-height: 1.25; max-width: none !important; }
+.lb-nm b, .lb-nm .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

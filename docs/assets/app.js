@@ -435,17 +435,19 @@
     const [d] = await Promise.all([get("prospects.json"), teams()]);
     const P = d.players;
     const { tierKey, tierLab } = prospectViews(d);
+    const FR_KEY = tierKey[tierLab.indexOf("1st round")];  // men: top 30; women: top 12
     XD = { window: d.window, first: d.pro_first || 2009, last: d.pro_last || 2026 };
     const confs = [...new Set(P.map((p) => p.conf).filter(Boolean))].sort();
-    const board = (key, title, note, fmtv) => `<div class="card"><h2>${title}</h2><p class="note" style="margin-top:-4px">${note}</p>${P.slice().sort((a, b) => b[key] - a[key]).slice(0, 10).map((p, i) => `
+    // each board is ranked by the number it shows (ties: overall draft score)
+    const board = (key, title, note, fmtv) => `<div class="card"><h2>${title}</h2><p class="note" style="margin-top:-4px">${note}</p>${P.slice().sort((a, b) => b[key] - a[key] || b.draft_score - a.draft_score).slice(0, 10).map((p, i) => `
         <div class="odds-row lb-row"><span class="faint num">${i + 1}</span>
-          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm"><b>${esc(p.name)}</b> <span class="faint small">${esc(p.cls || "")} · ${esc(p.team)}</span></span></span>
+          <span class="teamcell" style="font-weight:500">${logo(TEAMS[p.team])}<span class="nm lb-nm"><b>${esc(p.name)}</b><span class="faint small">${esc(p.cls || "")} · ${esc(p.team)}</span></span></span>
           <div class="pbar lb-bar"><span style="width:${(100 * p[key] / Math.max(...P.map((x) => x[key]))).toFixed(1)}%"></span></div><div class="num" style="text-align:right;font-weight:600">${fmtv(p)}</div></div>`).join("")}</div>`;
     const bt = d.backtest;
     app.innerHTML = `
       <div class="page-head"><div><h1>${d.draft_year} ${PRO} Prospects</h1>
         <p class="sub">Two models built on every D-I player-season since ${d.train ? d.train.first || (IS_W ? 2019 : 2008) : IS_W ? 2019 : 2008}. The <b>draft model</b> predicts where college players will be picked this ${MONTH}. The <b>success model</b> predicts whether a player becomes an established ${PRO} rotation player: ${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons. Both are trained only on completed seasons and checked out-of-sample against real drafts and real ${PRO} careers. ${IS_W ? "College players only: international prospects aren't modeled. The WNBA has only 36 picks and 144 roster spots, so even very good college players often don't stick; the women's history is also shorter (box scores since 2019), so these models are less certain than the men's." : "College players only: international and G League prospects aren't modeled, so board slots run ahead of real picks. Early in the season, ratings lean on last season and recruiting."}</p></div></div>
-      <div class="grid g2">${board("draft_score", "Projected draft board", `College players most likely to go early this ${MONTH} (P = ${tierLab[1].toLowerCase()})`, (p) => pct(p[tierKey[1]]))}
+      <div class="grid g2">${board(FR_KEY, "Likeliest first-rounders", `P(picked in the first round this ${MONTH})`, (p) => pct(p[FR_KEY]))}
         ${board("p_success", `Best ${PRO} bets`, `P(${d.success_ws}+ Win Shares in ${his} first ${d.window} ${PRO} seasons)`, (p) => pct(p.p_success))}</div>
       <div class="section controls">
         <input type="search" id="xq" placeholder="Search prospects or teams…" style="width:230px" value="${esc(XF.q)}" aria-label="Search prospects">
@@ -606,6 +608,8 @@
     hz.addEventListener("mouseleave", () => { hl.style.display = hd.style.display = "none"; hideTip(); });
   }
 
+  // legend drawn with the same marks the sliders use
+  const sliderKey = (recent) => `<div class="slider-key"><span><i class="k-pt"></i>season</span>${recent ? `<span><i class="k-pt r"></i>last ~8 games</span>` : ""}<span><i class="k-band"></i>uncertainty</span><span><i class="k-sig">★</i>signature trait</span></div>`;
   function slider(f, score, sd, p, strong, score2, cls2 = "b") {
     const lo = Phi(score - sd) * 100, hi = Phi(score + sd) * 100;
     const extra = isNum(score2) ? `<span class="pt ${cls2}" style="left:${(Phi(score2) * 100).toFixed(1)}%"></span>` : "";
@@ -684,7 +688,7 @@
             <p class="note">Descriptive notes from the style profile. The Matchup Lab shows what the game model actually prices in.</p></div>
           <div class="card"><h2>Recent changes &amp; context</h2><ul class="clean warn">${card.changes.map((s) => `<li>${esc(s)}</li>`).join("") || "<li class='empty muted'>No significant style shift in recent games.</li>"}</ul>
             <ul class="clean arrow" style="margin-top:10px">${card.context.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div></div>`;
-      styleHtml = `<div class="section grid g3">${BLOCKS.map(([b, lab]) => `<div class="card"><h2>${lab} dimensions</h2><p class="note" style="margin-top:-4px">Percentile vs all team-seasons; band = uncertainty${card.recent ? "; small orange dot = last ~8 games" : ""}; ● = signature trait.</p><div class="sliders">${STYLE.blocks[b].factors.map((f, i) => slider(f, card.blocks[b].scores[i], card.blocks[b].sd[i], card.blocks[b].pct[i], strong.has(b + ":" + i), card.recent ? card.recent[b][i] : null, "r")).join("")}</div></div>`).join("")}</div>
+      styleHtml = `<div class="section grid g3">${BLOCKS.map(([b, lab]) => `<div class="card"><h2>${lab} dimensions</h2><p class="note" style="margin-top:-4px">Percentile vs all team-seasons.</p>${sliderKey(card.recent)}<div class="sliders">${STYLE.blocks[b].factors.map((f, i) => slider(f, card.blocks[b].scores[i], card.blocks[b].sd[i], card.blocks[b].pct[i], strong.has(b + ":" + i), card.recent ? card.recent[b][i] : null, "r")).join("")}</div></div>`).join("")}</div>
         <div class="section card"><h2>Supporting evidence</h2><p class="note" style="margin-top:-4px">Opponent- and venue-adjusted play-by-play stats behind the identity, vs the ${LG} average that season.</p>
           <div class="tbl-wrap"><table class="evidence"><thead><tr><th class="l nosort">Stat</th><th class="nosort">${esc(t.abbr || name)}</th><th class="nosort">${LG} avg</th><th class="l nosort">Percentile</th></tr></thead><tbody>${(card.evidence || []).map((e) => `<tr><td class="l">${esc(e.label)}</td><td class="num">${esc(e.value)}</td><td class="num faint">${esc(e.avg)}</td><td class="l"><span class="minibar"><i style="width:${e.pct}%"></i></span> <span class="small faint num">${ord(e.pct)}</span></td></tr>`).join("")}</tbody></table></div></div>`;
     } else if (ids) {
