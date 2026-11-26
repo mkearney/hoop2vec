@@ -26,6 +26,8 @@ CLS_NUM = {"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}
 def cls_num(s: pd.Series) -> pd.Series:
     """College class (Fr..Sr) or pro career year ("R" = rookie, "2", "3", ...) -> 1, 2, 3, ..."""
     def one(x):
+        if not isinstance(x, str):  # missing (None / NaN / pd.NA from Arrow-backed string columns)
+            return np.nan
         if x in CLS_NUM:
             return CLS_NUM[x]
         if x == "R":
