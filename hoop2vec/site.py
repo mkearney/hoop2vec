@@ -12,10 +12,10 @@ import json
 
 from .config import SITE_ROOT
 
-BALL = ('<svg class="brand-ball" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#eb6834"/>'
-        '<path d="M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44" stroke="#111" stroke-width="3.5" fill="none"/></svg>')
-ICON = ("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23eb6834'/>"
-        "<path d='M2 32h60M32 2v60M10 10c12 10 12 34 0 44M54 10c-12 10-12 34 0 44' stroke='%23111' stroke-width='3' fill='none'/></svg>")
+from . import brand
+
+LOGO = brand.mark() + brand.wordmark()          # the official logo: ⟨●⟩ hoop2vec
+ICON = brand.favicon()
 FONTS_CSS = ("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500"
              "&display=swap")
 # Cloudflare Web Analytics: cookieless page-view counts (dash.cloudflare.com > Analytics & Logs > Web Analytics).
@@ -152,7 +152,7 @@ def league_page(league: str, S: dict | None = None) -> str:
                 stamp=S.get("stamp"), img_alt=alt, modified=_modified(S), S=S, league=league) + f'''<body data-league="{league}">
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="brand" href="../">{BALL}<span>hoop2vec</span></a>
+      <a class="brand" href="../" aria-label="hoop2vec home">{LOGO}</a>
       <nav class="nav" id="nav" aria-label="Sections">
 {nav(league)}
       </nav>
@@ -169,6 +169,7 @@ def league_page(league: str, S: dict | None = None) -> str:
     <a href="https://github.com/mkearney/hoop2vec">source</a>
   </footer>
   <div id="tooltip" class="tooltip" role="tooltip"></div>
+  {brand.templates()}
   <script src="../assets/app.js"></script>
 </body>
 </html>
@@ -183,6 +184,16 @@ def _top5_html(S: dict) -> str:
     return "<b>Top 5 today</b>" + "".join(
         f'<span class="row">{f"<img class=\"logo\" src=\"{e(t["logo"])}\" alt=\"\" loading=\"lazy\">" if t.get("logo") else ""}'
         f'<span>{t["rank"]}. {e(t["team"])}</span></span>' for t in S["top"])
+
+
+HOW = [("vector", "Ratings", "Every team is a vector of offense, defense and tempo, re-solved each morning from the games so far."),
+       ("neural", "Matchup network", "A neural network learns team embeddings and scores how any two teams fit together."),
+       ("latent", "Team identities", "Factor analysis places every team in a style space and names its archetype."),
+       ("arc", "Forecasts", "Each game gets a margin and a win probability, graded on seasons the model never saw.")]
+
+
+def how_html() -> str:
+    return "".join(f'\n        <div class="how-item">{brand.art(k)}<div><h3>{t}</h3><p>{d}</p></div></div>' for k, t, d in HOW)
 
 
 def chooser_page(summaries: dict | None = None) -> str:
@@ -208,14 +219,21 @@ def chooser_page(summaries: dict | None = None) -> str:
     return head(title="hoop2vec · Basketball ratings and forecasts", desc=H.get("desc", ""), path="", root="",
                 img="share.png" if (SITE_ROOT / "share.png").exists() else None, stamp=H.get("stamp"), img_alt=alt + ".",
                 modified=_modified(H), home=True, S=H) + f'''<body class="chooser">
-  <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./">{BALL}<span>hoop2vec</span></a>
+  <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="./" aria-label="hoop2vec home">{LOGO}</a>
     <div class="top-right" style="margin-left:auto">{THEME_BTN}</div></div></header>
   <main class="wrap">
     <section class="choose-hero">
+      {brand.mark("hero-mark")}
       <h1>Basketball ratings and forecasts</h1>
       <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">{cards}
+    </section>
+    <section class="how" aria-labelledby="how-head">
+      <h2 class="choices-head" id="how-head">How it works</h2>
+      <div class="how-grid">{how_html()}
+      </div>
+      <a class="how-more" href="mens/#/method">Read the full method →</a>
     </section>
   </main>
   <footer class="wrap footer"><span>hoop2vec · free public data only</span><a href="https://github.com/mkearney/hoop2vec">source</a></footer>

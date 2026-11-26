@@ -49,6 +49,8 @@
   const ord = (n) => { n = Math.round(n); const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const logo = (t, cls = "") => (t && t.logo ? `<img class="logo ${cls}" src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<span class="logo ${cls}"></span>`);
+  // logo mark and spot art: <template id="art-*"> in the page shell (hoop2vec/brand.py), colored by theme tokens
+  const art = (k, cls = "") => { const t = document.getElementById("art-" + k); return t ? (cls ? t.innerHTML.replace('class="art spot"', `class="art spot ${cls}"`) : t.innerHTML) : ""; };
   const locWord = (l) => (l > 0 ? "vs" : l < 0 ? "@" : "N");
   const erf = (x) => { const t = 1 / (1 + 0.3275911 * Math.abs(x)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
   const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
@@ -135,7 +137,7 @@
     const lgName = { mens: "Men's college", womens: "Women's college", nba: "NBA", wnba: "WNBA" }[LEAGUE];
     document.title = [name === "team" && arg ? decodeURIComponent(arg).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : sec,
       lgName, "hoop2vec"].filter(Boolean).join(" · ");
-    app.innerHTML = `<div class="loading">Loading…</div>`;
+    app.innerHTML = `<div class="loading">${art("mark")}<span>Loading…</span></div>`;
     try {
       await fn(arg ? decodeURIComponent(arg) : null, params);
     } catch (e) {
@@ -209,7 +211,7 @@
       <div class="page-head"><div>
         <h1>Power Ratings</h1>
         <p class="sub">${seasonLabel(r.season)} · ${r.teams.length} teams · updated ${esc(r.updated)}. <b>Power</b> is how many points per 100 possessions a team would beat an average ${LG} team by on a neutral floor (0 = average), from the final game model: a matchup network blended with a dynamic-rating linear model, checked for leakage against betting lines.</p>
-      </div></div>
+      </div>${art("vector")}</div>
       <div class="controls">
         <input type="search" id="q" placeholder="Search teams…" value="${esc(R.q)}" style="width:220px" aria-label="Search teams">
         <select id="conf" aria-label="Conference"><option value="">All conferences</option>${confs.map((c) => `<option ${c === R.conf ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
@@ -880,7 +882,7 @@
       site: params.get("site") || (IS_PRO ? "a" : "neutral"), type: params.get("type") || (IS_PRO ? "reg" : "ncaa") };
     if (st.a === st.b) st.b = names.find((n) => n !== st.a);
     app.innerHTML = `
-      <div class="page-head"><div><h1>Matchup Lab</h1><p class="sub">Any two teams, any site. The full game model runs in your browser: the matchup network, the dynamic-rating linear model, travel to the venue, injuries and style.</p></div></div>
+      <div class="page-head"><div><h1>Matchup Lab</h1><p class="sub">Any two teams, any site. The full game model runs in your browser: the matchup network, the dynamic-rating linear model, travel to the venue, injuries and style.</p></div>${art("neural")}</div>
       <div class="card">
         <div class="lab-pick"><div><label>Team A</label><div id="ca"></div></div><div class="vs-mid">vs</div><div><label>Team B</label><div id="cb"></div></div></div>
         <div class="controls" style="margin:12px 0 0">
@@ -1026,7 +1028,7 @@
         <span class="r pre small ${ok ? "pos" : "neg"}">${ok ? "✓" : "✗"} pre ${pct(Math.max(x.p_a, 1 - x.p_a))}</span></div>`;
     };
     app.innerHTML = `
-      <div class="page-head"><div><h1>Games</h1><p class="sub">Forecasts for the next week of ${LG} games, and how this season's pre-game forecasts have done. The current season is never used to train the model, so these numbers are out-of-sample.</p></div></div>
+      <div class="page-head"><div><h1>Games</h1><p class="sub">Forecasts for the next week of ${LG} games, and how this season's pre-game forecasts have done. The current season is never used to train the model, so these numbers are out-of-sample.</p></div>${art("arc")}</div>
       ${acc ? `<div class="tiles">
         <div class="tile"><span class="k">Games this season</span><span class="v num">${acc.n.toLocaleString()}</span></div>
         <div class="tile"><span class="k">Winners called</span><span class="v num">${pct(acc.accuracy, 1)}</span></div>
@@ -1059,7 +1061,7 @@
     const d = await identities(s);
     const M = (b) => STYLE.blocks[b];
     app.innerHTML = `
-      <section class="hero"><div><h1>How every team plays, separate from how good it is</h1>
+      <section class="hero"><div>${art("latent", "hero-spot")}<h1>How every team plays, separate from how good it is</h1>
           <p>Each ${LG} team gets an offensive, defensive and personnel identity from play-by-play: shot locations, ball movement, pace, pressure, rebounding and roster build. Team strength is regressed out first, so these are styles, not rankings. <a href="#/guide">Style guide →</a></p></div>
         <div class="kpis"><div class="tile"><span class="v">${d.teams.length}</span><span class="k">teams profiled</span></div><div class="tile"><span class="v">${M("offense").factors.length + M("defense").factors.length + M("roster").factors.length}</span><span class="k">style dimensions</span></div><div class="tile"><span class="v">${M("offense").archetypes.length + M("defense").archetypes.length + M("roster").archetypes.length}</span><span class="k">archetypes</span></div></div></section>
       <section class="section card"><div class="section-head"><h2 style="margin:0">Style map</h2>
@@ -1133,7 +1135,7 @@
     if (!STYLE) { app.innerHTML = `<div class="card">Style identities are not available yet.</div>`; return; }
     const d = await identities();
     const lead = (b, i, dir) => d.teams.slice().sort((x, y) => dir * (y.blocks[b].scores[i] - x.blocks[b].scores[i])).slice(0, 4).map((t) => idLink(t)).join(", ");
-    app.innerHTML = `<div class="page-head"><div><h1>Style guide</h1><p class="sub">Every dimension was found by factor analysis on ${STYLE.n_train.toLocaleString()} team-seasons (${STYLE.train_seasons[0]}–${STYLE.train_seasons[STYLE.train_seasons.length - 1]}) after removing team strength, then named by hand. Archetypes are soft clusters (Gaussian mixture) in that space.</p></div></div>
+    app.innerHTML = `<div class="page-head"><div><h1>Style guide</h1><p class="sub">Every dimension was found by factor analysis on ${STYLE.n_train.toLocaleString()} team-seasons (${STYLE.train_seasons[0]}–${STYLE.train_seasons[STYLE.train_seasons.length - 1]}) after removing team strength, then named by hand. Archetypes are soft clusters (Gaussian mixture) in that space.</p></div>${art("latent")}</div>
       ${BLOCKS.map(([b, lab]) => `<section class="section"><h2>${lab} dimensions</h2><div class="grid g3">${STYLE.blocks[b].factors.map((f, i) => `<div class="card factor-card">
           <h2 style="font-size:16px">${esc(f.name)}</h2><p class="small muted" style="margin:2px 0 6px">${esc(f.desc)}</p><div class="poles2"><span>← ${esc(f.low)}</span><span>${esc(f.high)} →</span></div>
           <div class="loads">${f.loadings.slice(0, 6).map((l) => `<div class="load"><span>${esc(l.label)}</span><span class="bar"><i style="${l.w >= 0 ? `left:50%;width:${Math.min(50, Math.abs(l.w) * 50)}%;background:var(--accent)` : `right:50%;width:${Math.min(50, Math.abs(l.w) * 50)}%;background:var(--hot)`}"></i></span></div>`).join("")}</div>
@@ -1268,7 +1270,7 @@
     const L = LEAGUE.toUpperCase();
     const btHtml = backtestHtml(bt, `Lines are a benchmark only, never a model input. ESPN has carried DraftKings lines for ${L} games in recent seasons. A sportsbook should beat any public-data model over a full season; the gap is the honest yardstick.`);
     app.innerHTML = `<div class="prose">
-      <div class="page-head"><div><h1>How it works</h1><p class="sub">The ${L} site runs the same pipeline as the college sites (point-in-time ratings, player values, a blended game model, team identities), with the bracket replaced by a playoff model built for best-of-N series.</p></div></div>
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">The ${L} site runs the same pipeline as the college sites (point-in-time ratings, player values, a blended game model, team identities), with the bracket replaced by a playoff model built for best-of-N series.</p></div>${art("mark")}</div>
       <h2>Backtest</h2>${btHtml}
       <h2>1 · Data (free and public)</h2>
       <ul>
@@ -1297,7 +1299,7 @@
     const bt = await get("backtest.json", true);
     const btHtml = backtestHtml(bt, "Lines are a benchmark only, never a model input. ESPN carries sportsbook lines for women's games only from 2025-26, and mostly for bigger games, so this is a small, selected sample. The model edges the line there. Women's betting markets are thinner than men's, so that's plausible, but it's exactly the symptom that exposed the men's leak, so it was checked the same way: a one-term model on the roster rating alone scores 0.404 log loss on those games, worse than the line (0.396). On the men's side, the leaky roster rating beat the line. The Kalman rating alone is level with the line.");
     app.innerHTML = `<div class="prose">
-      <div class="page-head"><div><h1>How it works</h1><p class="sub">The women's site runs the same pipeline as the men's (point-in-time ratings, player values, a blended game model, exact bracket odds, team identities and WNBA prospects), rebuilt on data that is free for the women's game.</p></div></div>
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">The women's site runs the same pipeline as the men's (point-in-time ratings, player values, a blended game model, exact bracket odds, team identities and WNBA prospects), rebuilt on data that is free for the women's game.</p></div>${art("mark")}</div>
       <h2>Backtest</h2>${btHtml}
       <h2>1 · Data (free and public)</h2>
       <ul>
@@ -1326,7 +1328,7 @@
 
   function methodHtml(bt, btHtml) {
     return `<div class="prose">
-      <div class="page-head"><div><h1>How it works</h1><p class="sub">Public data → point-in-time ratings, players and styles → a blended game model → ratings, forecasts and the bracket. hoop2vec merges two earlier projects (mmai and mmkm), keeping the better piece wherever they overlapped.</p></div></div>
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">Public data → point-in-time ratings, players and styles → a blended game model → ratings, forecasts and the bracket. hoop2vec merges two earlier projects (mmai and mmkm), keeping the better piece wherever they overlapped.</p></div>${art("mark")}</div>
       <h2>Backtest</h2>${btHtml}
       <h2>1 · Data (free and public)</h2>
       <ul>

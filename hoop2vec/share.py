@@ -127,31 +127,10 @@ def _fit(d, text: str, font, width: int) -> str:
     return text.rstrip() + "…"
 
 
-def _ball(img, x: int, y: int, size: int):
-    """The site's basketball mark (the same paths as the SVG logo), drawn at 4x and scaled down for smooth edges."""
-    from PIL import Image, ImageDraw
-    s = size * 4
-    k = s / 64.0                                   # SVG viewBox is 64 x 64
-    m = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(m)
-    d.ellipse((2 * k, 2 * k, 62 * k, 62 * k), fill=C["hot"])
-    w = max(2, round(3.5 * k))
-
-    def bez(p0, p1, p2, p3, n=40):
-        pts = []
-        for i in range(n + 1):
-            t = i / n
-            a, b, c, e = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3
-            pts.append(((a * p0[0] + b * p1[0] + c * p2[0] + e * p3[0]) * k, (a * p0[1] + b * p1[1] + c * p2[1] + e * p3[1]) * k))
-        return pts
-    d.line([(2 * k, 32 * k), (62 * k, 32 * k)], fill="#111111", width=w)
-    d.line([(32 * k, 2 * k), (32 * k, 62 * k)], fill="#111111", width=w)
-    d.line(bez((10, 10), (22, 20), (22, 44), (10, 54)), fill="#111111", width=w, joint="curve")
-    d.line(bez((54, 10), (42, 20), (42, 44), (54, 54)), fill="#111111", width=w, joint="curve")
-    mask = Image.new("L", (s, s), 0)
-    ImageDraw.Draw(mask).ellipse((2 * k, 2 * k, 62 * k, 62 * k), fill=255)
-    m.putalpha(Image.composite(m.getchannel("A"), Image.new("L", (s, s), 0), mask))
-    img.alpha_composite(m.resize((size, size), Image.LANCZOS), (x, y))
+def _mark(img, x: int, y: int, height: int):
+    """The bracket mark (brand.py), seams in the image background."""
+    from .brand import draw_mark
+    return draw_mark(img, x, y, height, ink=C["text"], ball=C["hot"], cut=C["bg"])
 
 
 def _logo(url: str | None, size: int):
@@ -173,8 +152,13 @@ def _logo(url: str | None, size: int):
 
 
 def _brand(img, d, x: int, y: int):
-    _ball(img, x, y, 40)
-    d.text((x + 54, y + 20), "hoop2vec", font=_font("ExtraBold", 32), fill=C["text"], anchor="lm")
+    """The official logo: the bracket mark, then "hoop2vec" with an orange 2, vertically centred on y + 20."""
+    w = _mark(img, x, y + 5, 30)
+    f = _font("ExtraBold", 34)
+    tx = x + w + 10
+    for part, col in (("hoop", C["text"]), ("2", C["hot"]), ("vec", C["text"])):
+        d.text((tx, y + 20), part, font=f, fill=col, anchor="lm")
+        tx += d.textlength(part, font=f) - 1
 
 
 def render_league(league: str, S: dict, path: Path):
@@ -245,13 +229,20 @@ def render_home(summaries: dict, path: Path):
 
 def render_icons(out_dir: Path):
     """PNG icons for the platforms that ignore SVG favicons (iOS home screen, older browsers)."""
-    from PIL import Image
-    for name, size, pad in (("apple-touch-icon.png", 180, 22), ("icon-512.png", 512, 40), ("icon-32.png", 32, 1)):
+    from PIL import Image, ImageDraw
+    for name, size in (("apple-touch-icon.png", 180), ("icon-512.png", 512), ("icon-32.png", 32)):
         f = out_dir / name
         if f.exists():
             continue
-        img = Image.new("RGBA", (size, size), C["bg"] if name.startswith("apple") else (0, 0, 0, 0))
-        _ball(img, pad, pad, size - 2 * pad)
+        # a light tile (rounded except for iOS, which rounds it itself) so the dark brackets read on any background
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        if name.startswith("apple"):
+            img.paste(Image.new("RGBA", (size, size), C["bg"]))
+        else:
+            ImageDraw.Draw(img).rounded_rectangle((0, 0, size - 1, size - 1), radius=round(size * .22), fill=C["bg"])
+        h = round(size * (0.56 if size > 32 else 0.62))
+        w = round(h * 102 / 76)
+        _mark(img, (size - w) / 2, (size - h) / 2, h)
         img.save(f, optimize=True)
 
 
