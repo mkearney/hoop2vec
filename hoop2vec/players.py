@@ -155,7 +155,34 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
     Returns (per_game DataFrame keyed by season/gid/team, live dict team->player table).
     ``availability``: {(team, pid): prob_available} used for the live (next game) state.
     """
-    availability = availability or {}
+    from . import memo
+    g = games[games["type"] != "nond1"]
+    pgi = pg[pg["min"] > 0]
+    cur = current_season()
+    frames, live = [], {}
+    for season in sorted(g["season"].unique()):
+        gs = g.loc[g["season"] == season, _G_COLS]
+        ps_ = pgi.loc[pgi["season"] == season, _PG_COLS]
+        pr = priors.loc[priors["season"] == season, _PRI_COLS]
+        if season < cur:  # completed season: an earlier run's result for the same inputs (no live injuries apply)
+            frames.append(memo.cached(f"player-feats-{season}", (gs, ps_, pr), lambda: pd.DataFrame(
+                _season_player_features(gs, ps_, pr, {}, cur)[0], columns=_PF_COLS)))
+        else:
+            rows, lv = _season_player_features(gs, ps_, pr, availability or {}, cur)
+            frames.append(pd.DataFrame(rows, columns=_PF_COLS))
+            live.update(lv)
+    return pd.concat(frames, ignore_index=True), live
+
+
+_G_COLS = ["season", "date", "gid", "team_a", "team_b", "played", "minutes", "type"]
+_PG_COLS = ["season", "team", "pid", "muid", "min", "bpm", "obpm", "dbpm"]
+_PRI_COLS = ["season", "pid", "prior_v", "prior_o", "prior_d", "inches", "experience", "returning"]
+_PF_COLS = ["season", "gid", "team", "roster", "roster_o", "roster_d", "avail_delta", "height", "experience",
+            "star", "bench", "continuity", "avail_delta_pre"]
+
+
+def _season_player_features(g: pd.DataFrame, pgi: pd.DataFrame, priors: pd.DataFrame, availability: dict, cur: int):
+    """team_player_features for one season's games (D-I only), player games (min > 0) and priors: (rows, live)."""
     def num(col, fill=np.nan):  # nullable/NA-safe -> plain float64
         return pd.to_numeric(priors[col], errors="coerce").astype("float64").fillna(fill).to_numpy()
 
@@ -165,15 +192,12 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         priors["returning"].fillna(False).astype(float).to_numpy())}
     out_rows = []
     live = {}
-    g = games[games["type"] != "nond1"]
     long = pd.concat([
         g[["season", "date", "gid", "team_a", "played", "minutes", "type"]].rename(columns={"team_a": "team"}),
         g[["season", "date", "gid", "team_b", "played", "minutes", "type"]].rename(columns={"team_b": "team"}),
     ])
     long["minutes"] = long["minutes"].fillna(5 * GAME_MINUTES)
-    pgi = pg[pg["min"] > 0]
     pg_by = {k: v for k, v in pgi.groupby(["season", "team"])}
-    cur = current_season()
     for (season, team), tg in long.groupby(["season", "team"]):
         tg = tg.sort_values("date")
         played = tg[tg["played"]]
@@ -274,9 +298,7 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
             out_rows.append((season, r.gid, team) + fj)
         if season >= cur:
             out_rows.append((season, "__live__", team) + feats_by_j[n])
-    cols = ["season", "gid", "team", "roster", "roster_o", "roster_d", "avail_delta", "height", "experience",
-            "star", "bench", "continuity", "avail_delta_pre"]
-    return pd.DataFrame(out_rows, columns=cols), live
+    return out_rows, live
 
 
 # average sorted minute share of a D-I rotation (shares sum to 5); fit on 2009-2026 team-seasons

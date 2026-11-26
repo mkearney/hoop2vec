@@ -294,10 +294,28 @@ To preview locally: `cd docs && python -m http.server`.
 ### Automation
 
 * `.github/workflows/daily.yml`: every morning, all four leagues in turn (a league out of season has nothing new).
+  The committed record of the site.
+* `.github/workflows/live.yml`: every 10 minutes, updates leagues as their games finish (below).
 * `.github/workflows/retrain.yml`: monthly retrain + backtest for every league, or on demand.
 * `.github/workflows/backfill-shots.yml`: on demand, backfill past seasons' shot locations for one league and re-publish.
+* `.github/workflows/pages.yml`: deploys `docs/` to GitHub Pages. The other workflows call it after they publish,
+  and it also runs when a push to `main` changes `docs/`.
 
-Enable Pages once: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
+Enable Pages once: **Settings → Pages → Source → GitHub Actions**.
+
+**Live updates** (`hoop2vec/live.py`). A check job reads ESPN's scoreboard for yesterday and today in every league in
+season. It needs only the standard library, so nothing is installed. If no game has finished since the last live
+publish, the run ends there, after a few seconds. Otherwise each league with new finals gets
+`python -m hoop2vec live --<league>`. That's the daily pipeline with only the new games fetched (men's college:
+ESPN on top of the Torvik snapshot, never barttorvik.com), completed seasons reused from the data cache, no
+training, and no prospect boards. It takes about 1–2 minutes plus setup. Live data never goes into git. Each
+league's latest site data and the list of finals it includes live in the Actions cache (`live/<league>/`), and the
+Pages deploy puts them over the committed `docs/` wherever they're newer. The next morning's daily run is newer
+again and takes over. Run `live.yml` by hand with **force** to refresh every league in season right away.
+
+Completed seasons are reused exactly, not approximated: the slow per-season steps (rating snapshots, roster
+features) are stored with a hash of their inputs (`hoop2vec/memo.py`, and the input keys in `snapshots.parquet`'s
+metadata), so a change to any input recomputes that season. Full daily runs get faster too.
 
 ## Layout
 
@@ -321,6 +339,8 @@ hoop2vec/            python package
   predict.py         live team state, blended predictor, Power ratings, upcoming games
   bracket.py         projected/actual bracket, exact probabilities, picks
   pipeline.py        end-to-end + site JSON
+  live.py            live updates as games finish: scoreboard check, live refresh, overlay for the Pages deploy
+  memo.py            completed seasons' slow steps reused across runs (keyed by a hash of their inputs)
 history/<league>/    compact committed copy of completed seasons (games, players, venues, lines, pro careers)
 artifacts/<league>/  trained models, blend weight, crosswalk, team metadata, style model, backtests
 overrides/<league>/  hand-edited injuries and bracket

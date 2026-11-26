@@ -6,3 +6,4 @@ __pycache__/
 *.egg-info/
 artifacts/*/style/train_table.parquet
 artifacts/*/backtest_games.parquet
+/live/

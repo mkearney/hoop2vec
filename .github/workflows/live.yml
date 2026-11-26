@@ -1,0 +1,130 @@
+name: live-refresh
+
+# Every 10 minutes: re-publish the leagues whose games have just finished (hoop2vec/live.py). A run with nothing new
+# ends after the check job (a few seconds, nothing installed). Live data goes to Pages and the Actions cache, never to
+# git; the overnight daily refresh stays the committed record and takes over again each morning.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refresh every league in season, even without newly finished games
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      leagues: ${{ steps.check.outputs.leagues }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: hoop2vec
+      - name: Restore live state (mens)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/mens
+          key: hoop2vec-live-mens-${{ github.run_id }}
+          restore-keys: hoop2vec-live-mens-
+      - name: Restore live state (womens)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/womens
+          key: hoop2vec-live-womens-${{ github.run_id }}
+          restore-keys: hoop2vec-live-womens-
+      - name: Restore live state (nba)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/nba
+          key: hoop2vec-live-nba-${{ github.run_id }}
+          restore-keys: hoop2vec-live-nba-
+      - name: Restore live state (wnba)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/wnba
+          key: hoop2vec-live-wnba-${{ github.run_id }}
+          restore-keys: hoop2vec-live-wnba-
+      - name: Leagues with newly finished games (ESPN scoreboard; standard library only)
+        id: check
+        env:
+          HOOP2VEC_LIVE_FORCE: ${{ inputs.force && '1' || '' }}
+        run: python3 -m hoop2vec.live check
+
+  refresh:
+    needs: check
+    if: needs.check.outputs.leagues != '' && needs.check.outputs.leagues != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        league: ${{ fromJSON(needs.check.outputs.leagues) }}
+    concurrency:
+      group: hoop2vec-live-${{ matrix.league }}   # one live refresh per league at a time
+      cancel-in-progress: false
+    env:
+      HOOP2VEC_LEAGUE: ${{ matrix.league }}
+      HOOP2VEC_LIVE_FORCE: ${{ inputs.force && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore live state
+        uses: actions/cache/restore@v4
+        with:
+          path: live/${{ matrix.league }}
+          key: hoop2vec-live-${{ matrix.league }}-${{ github.run_id }}
+          restore-keys: hoop2vec-live-${{ matrix.league }}-
+      - name: Still new? (a refresh that waited for the previous one may find nothing left to do)
+        id: need
+        run: |
+          out=$(python3 -m hoop2vec.live check-one | tail -n1)
+          echo "$out"
+          [[ "$out" == new* ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        if: steps.need.outputs.run == 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        if: steps.need.outputs.run == 'true'
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Restore data cache
+        if: steps.need.outputs.run == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: data/${{ matrix.league }}
+          key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
+          restore-keys: hoop2vec-data-${{ matrix.league }}-
+      - name: Live refresh (${{ matrix.league }})
+        id: live
+        if: steps.need.outputs.run == 'true'
+        run: python -m hoop2vec live "--${{ matrix.league }}"
+      - name: Save data cache
+        if: steps.live.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: data/${{ matrix.league }}
+          key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
+      - name: Save live state
+        if: steps.live.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: live/${{ matrix.league }}
+          key: hoop2vec-live-${{ matrix.league }}-${{ github.run_id }}
+
+  deploy:
+    needs: [check, refresh]
+    if: ${{ !cancelled() && needs.check.outputs.leagues != '' && needs.check.outputs.leagues != '[]' }}
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

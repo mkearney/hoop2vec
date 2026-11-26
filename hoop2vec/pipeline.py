@@ -247,7 +247,7 @@ def load_bundle(feat=None):
 
 
 # ------------------------------------------------------------------------ publish
-def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
+def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report, is_live=False):
     season = current_season()
     from . import site
     site.write()
@@ -366,7 +366,8 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report):
     else:
         log("bracket")
         write_json("bracket.json", make_bracket(bundle, st, power, games, meta, season))
-        stage_prospects()
+        if not is_live:  # season-level player tables: one game doesn't move them (the overnight job refreshes them)
+            stage_prospects()
 
     from . import espn_fallback
     source = "espn" if espn_fallback.active(season) else "torvik"
@@ -695,14 +696,23 @@ def load_cached():
 
 
 def run(mode="daily"):
+    """mode: daily | train | backtest | all | publish | offline | live. ``live`` is the daily refresh as games finish
+    during the day (live.py): ESPN only (the men's Torvik download stays with the overnight job), completed seasons
+    from the cache (memo.py), no training, and the slow pieces a game doesn't move (prospects) are left as they are."""
     t0 = time.time()
     if mode == "publish":  # re-publish from cached features (fast iteration)
         stage_publish(*load_cached())
         log(f"finished in {time.time() - t0:.0f}s")
         return
+    is_live = mode == "live"
+    if is_live:
+        import os
+        os.environ["HOOP2VEC_FORCE_ESPN"] = "1"  # men's: the current season from ESPN on top of the Torvik snapshot
     games, meta, pg, ps, conf = stage_data(refresh=mode != "offline", refit=mode == "all")
     feat, snaps, live, extras, inj = stage_features(games, meta, pg, ps, conf)
     if mode in ("train", "all") or not NET_PATH.exists() or not (ARTIFACTS / "linear.pkl").exists():
+        if is_live:
+            raise SystemExit("live mode needs the trained models (artifacts/); run the daily job first")
         stage_train(feat)
     if mode in ("backtest", "all"):
         stage_backtest(feat)
@@ -713,5 +723,5 @@ def run(mode="daily"):
     if not (feat["season"].eq(current_season()) & feat["played"]).any():
         log("no games played yet this season - keeping last published site")
         return
-    stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj)
+    stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj, is_live=is_live)
     log(f"finished in {time.time() - t0:.0f}s")

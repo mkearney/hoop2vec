@@ -1,0 +1,73 @@
+name: pages
+
+# Deploys docs/ to GitHub Pages, with each league's latest live data (live.yml) on top wherever it is newer than the
+# committed data. Needs Settings -> Pages -> Source: "GitHub Actions".
+#
+# The live, daily, retrain and backfill workflows call this after they publish. It also runs on pushes to main that
+# change docs/ (a push made by a workflow doesn't start other workflows, hence the explicit calls).
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**"]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: hoop2vec-pages   # a newer deploy replaces a waiting one; each deploys the latest main + live data
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main             # the newest commit, including what the calling workflow just pushed
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install Pillow (share images)
+        run: pip install "$(grep -i '^pillow' requirements.txt)"
+      - name: Restore live data (mens)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/mens
+          key: hoop2vec-live-mens-${{ github.run_id }}
+          restore-keys: hoop2vec-live-mens-
+      - name: Restore live data (womens)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/womens
+          key: hoop2vec-live-womens-${{ github.run_id }}
+          restore-keys: hoop2vec-live-womens-
+      - name: Restore live data (nba)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/nba
+          key: hoop2vec-live-nba-${{ github.run_id }}
+          restore-keys: hoop2vec-live-nba-
+      - name: Restore live data (wnba)
+        uses: actions/cache/restore@v4
+        with:
+          path: live/wnba
+          key: hoop2vec-live-wnba-${{ github.run_id }}
+          restore-keys: hoop2vec-live-wnba-
+      - name: Put newer live data over the committed data
+        run: python -m hoop2vec.live overlay
+      - name: Page shells, share images and crawl files for the data being deployed
+        run: python -m hoop2vec site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
