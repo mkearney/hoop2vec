@@ -23,6 +23,13 @@ ANALYTICS = ("<script type='module' src='https://static.cloudflareinsights.com/b
              "data-cf-beacon='{\"token\": \"203a51614dc84183b570be1615329ed5\"}'></script>")
 
 
+def asset_v(name: str) -> str:
+    """Content hash for a shared asset, so browsers fetch the new file as soon as it changes (no stale CSS/JS)."""
+    import hashlib
+    f = SITE_ROOT / "assets" / name
+    return hashlib.sha1(f.read_bytes()).hexdigest()[:10] if f.exists() else "0"
+
+
 ABOUT = {"mens": "NCAA Division I men's basketball", "womens": "NCAA Division I women's basketball",
          "nba": "National Basketball Association", "wnba": "Women's National Basketball Association"}
 
@@ -106,7 +113,7 @@ def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp:
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="{FONTS_CSS}" rel="stylesheet">
-  <link rel="stylesheet" href="{root}assets/style.css">
+  <link rel="stylesheet" href="{root}assets/style.css?v={asset_v("style.css")}">
   <script type="application/ld+json" id="ld">{json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")}</script>
   {ANALYTICS}
 </head>
@@ -180,7 +187,7 @@ def league_page(league: str, S: dict | None = None) -> str:
   </footer>
   <div id="tooltip" class="tooltip" role="tooltip"></div>
   {brand.templates()}
-  <script src="../assets/app.js"></script>
+  <script src="../assets/app.js?v={asset_v("app.js")}"></script>
 </body>
 </html>
 '''

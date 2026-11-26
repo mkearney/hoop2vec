@@ -13,6 +13,23 @@ from __future__ import annotations
 import math
 
 
+# Default (light theme) colors written onto each shape, so the art renders correctly even before or without
+# style.css. The theme classes in style.css override these attributes.
+DEFAULTS = {"f-ink": ("fill", "#111110"), "s-ink": ("stroke", "#111110"), "f-ball": ("fill", "#eb6834"),
+            "s-ball": ("stroke", "#eb6834"), "f-cut": ("fill", "#f6f6f4"), "s-cut": ("stroke", "#f6f6f4"),
+            "f-blue": ("fill", "#2a78d6"), "f-soft": ("fill", "#fde3d7")}
+
+
+def _paint(svg: str) -> str:
+    import re
+
+    def one(m):
+        attrs = "".join(f' {a}="{v}"' for c in m.group(1).split() if c in DEFAULTS
+                        for a, v in [DEFAULTS[c]] if f" {a}=" not in m.group(2))
+        return f'class="{m.group(1)}"{attrs}{m.group(2)}'
+    return re.sub(r'class="([^"]*)"([^>]*)', lambda m: one(m) if not m.group(1).startswith("art") else m.group(0), svg)
+
+
 def _r(x: float) -> str:
     return f"{x:.1f}".rstrip("0").rstrip(".")
 
@@ -30,7 +47,7 @@ SEAMS = (f"M35 60H85M60 35V85M{_r(_sx)} {_r(_sy)}Q52.5 60 {_r(_sx)} {_r(120 - _s
 
 def mark(cls: str = "brand-mark") -> str:
     """The bracket mark for inline use. The seams are drawn in the background color (``--art-cut``)."""
-    return (f'<svg class="art {cls}" viewBox="{MARK_VIEWBOX}" aria-hidden="true">'
+    return _paint(f'<svg class="art {cls}" viewBox="{MARK_VIEWBOX}" width="28" height="21" aria-hidden="true">'
             f'<path class="s-ink" d="{BRACKETS}" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>'
             f'<circle class="f-ball" cx="60" cy="60" r="{BALL_R}"/>'
             f'<path class="s-cut" d="{SEAMS}" fill="none" stroke-width="3.4"/></svg>')
@@ -116,7 +133,7 @@ ART = {"vector": _vector, "neural": _neural, "arc": _arc, "latent": _latent}
 
 
 def art(name: str, cls: str = "spot") -> str:
-    return f'<svg class="art {cls}" viewBox="0 0 120 120" aria-hidden="true">{ART[name]()}</svg>'
+    return _paint(f'<svg class="art {cls}" viewBox="0 0 120 120" width="40" height="40" aria-hidden="true">{ART[name]()}</svg>')
 
 
 def templates() -> str:

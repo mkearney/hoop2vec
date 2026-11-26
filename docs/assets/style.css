@@ -89,11 +89,11 @@ p { margin: 0 0 .8em; }
 .card .art { --art-cut: var(--surface); }
 .page-head:has(> .spot) { flex-wrap: nowrap; align-items: center; }
 .page-head:has(> .spot) > div { min-width: 0; }
-.page-head .spot { width: 84px; height: 84px; flex: none; margin-left: auto; }
-.prose .page-head .spot { width: 76px; height: 57px; }
+.page-head .spot { width: 52px; height: 52px; flex: none; margin-left: auto; opacity: .9; }
+.prose .page-head .spot { width: 48px; height: 36px; }
 @media (max-width: 720px) { .page-head .spot { display: none; } }
 .loading { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.loading .spot { width: 52px; height: auto; animation: h2v-pulse 1.4s ease-in-out infinite; }
+.loading .spot { width: 40px; height: auto; animation: h2v-pulse 1.4s ease-in-out infinite; }
 @keyframes h2v-pulse { 50% { opacity: .45; transform: scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .loading .spot { animation: none; } }
 .nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
@@ -405,7 +405,7 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .leagues a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 .chooser main { min-height: calc(100vh - 140px); }
 .choose-hero { text-align: center; max-width: 760px; margin: 56px auto 32px; }
-.hero-mark { width: 92px; height: auto; margin: 0 auto 22px; }
+.hero-mark { width: 52px; height: auto; margin: 0 auto 16px; }
 .choose-hero h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -.02em; margin: 0 0 12px; }
 .choose-hero .sub { color: var(--text-2); font-size: 16px; line-height: 1.55; margin: 0; }
 .choices { display: grid; grid-template-columns: 1fr; gap: 28px; max-width: 1180px; margin: 0 auto 56px; }
@@ -422,19 +422,18 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .choice .top5 .logo { width: 18px; height: 18px; }
 .choice .go { margin-top: auto; font-weight: 650; color: var(--accent); }
 @media (min-width: 1080px) { .choices { grid-template-columns: 1fr 1fr; } .choice .muted.small { min-height: 4.35em; } }
-.how { max-width: 1180px; margin: 0 auto 64px; padding-top: 28px; border-top: 1px solid var(--border); }
-.how-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; margin-top: 6px; }
-.how-item { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.how-item .spot { width: 72px; height: 72px; }
-.how-item h3 { color: var(--text); text-transform: none; letter-spacing: -.01em; font-size: 16px; font-weight: 700; margin: 0 0 4px; }
-.how-item p { color: var(--text-2); margin: 0; line-height: 1.5; font-size: 13.5px; }
-.how-more { display: inline-block; margin-top: 22px; font-weight: 650; color: var(--accent); }
+.how { max-width: 1180px; margin: 0 auto 56px; padding-top: 24px; border-top: 1px solid var(--border); }
+.how-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 28px; }
+.how-item { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 2px 12px; align-items: start; min-width: 0; }
+.how-item .spot { width: 30px; height: 30px; }
+.how-item h3 { color: var(--text); text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 650; margin: 5px 0 2px; }
+.how-item p { color: var(--text-3); margin: 0; line-height: 1.45; font-size: 12.5px; }
+.how-more { display: inline-block; margin-top: 16px; font-size: 13px; font-weight: 600; color: var(--accent); }
 @media (max-width: 960px) { .how-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .how-grid { grid-template-columns: 1fr; } .how-item { flex-direction: row; align-items: flex-start; gap: 16px; }
-  .how-item .spot { width: 56px; height: 56px; } }
+@media (max-width: 520px) { .how-grid { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .leagues a { padding: 4px 7px; font-size: 12px; } }
 @media (max-width: 640px) { .group-cards { grid-template-columns: 1fr; } .choose-hero { margin-top: 32px; } .choice .muted.small, .choice .top5 { min-height: 0; } }
-.hero .hero-spot { width: 64px; height: 64px; margin-bottom: 14px; }
+.hero .hero-spot { width: 40px; height: 40px; margin-bottom: 10px; }
 /* crawlable ratings table in the page shell (site.py crawl_summary): readers with JS get the app instead */
 .js .crawl { display: none; }
 .crawl table { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
