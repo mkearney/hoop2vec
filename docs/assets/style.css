@@ -435,3 +435,7 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 @media (max-width: 860px) { .leagues a { padding: 4px 7px; font-size: 12px; } }
 @media (max-width: 640px) { .group-cards { grid-template-columns: 1fr; } .choose-hero { margin-top: 32px; } .choice .muted.small, .choice .top5 { min-height: 0; } }
 .hero .hero-spot { width: 64px; height: 64px; margin-bottom: 14px; }
+/* crawlable ratings table in the page shell (site.py crawl_summary): readers with JS get the app instead */
+.js .crawl { display: none; }
+.crawl table { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+.crawl th, .crawl td { padding: 3px 10px; border-bottom: 1px solid var(--border); text-align: left; }

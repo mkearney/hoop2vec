@@ -32,6 +32,7 @@ def structured(*, title: str, desc: str, url: str, image: str | None, S: dict, l
     today's top five as a ranked list of teams. The app rewrites the time and the list from the data it loads."""
     from .share import SITE_URL
     site_id = f"{SITE_URL}/#website"
+    graph_extra: list[dict] = []
     page = {"@type": "WebPage", "@id": f"{url}#webpage", "url": url, "name": title, "description": desc,
             "inLanguage": "en", "isPartOf": {"@id": site_id}}
     if S.get("iso"):
@@ -40,6 +41,13 @@ def structured(*, title: str, desc: str, url: str, image: str | None, S: dict, l
         page["primaryImageOfPage"] = {"@type": "ImageObject", "url": image, "width": 1200, "height": 630}
     if league:
         page["about"] = {"@type": "SportsOrganization", "name": ABOUT[league]}
+        data_url = f"{SITE_URL}/{league}/data/ratings.json"
+        graph_extra.append({"@type": "Dataset", "@id": f"{url}#ratings", "name": f"hoop2vec {ABOUT[league]} power ratings",
+                            "description": f"Daily power ratings for every team in {ABOUT[league]}: power, offensive and defensive "
+                                           "efficiency, tempo, roster strength, injuries and strength of schedule.",
+                            "url": url, "isAccessibleForFree": True, "creator": {"@id": site_id},
+                            **({"dateModified": S["iso"]} if S.get("iso") else {}),
+                            "distribution": [{"@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": data_url}]})
         if S.get("top"):
             page["mainEntity"] = {"@type": "ItemList", "name": "Power ratings: top 5", "itemListOrder": "https://schema.org/ItemListOrderAscending",
                                   "numberOfItems": len(S["top"]), "itemListElement": [
@@ -49,7 +57,7 @@ def structured(*, title: str, desc: str, url: str, image: str | None, S: dict, l
         page["about"] = [{"@type": "SportsOrganization", "name": n} for n in ABOUT.values()]
     site = {"@type": "WebSite", "@id": site_id, "url": f"{SITE_URL}/", "name": "hoop2vec",
             "description": "Basketball ratings and forecasts from free public data.", "inLanguage": "en"}
-    return {"@context": "https://schema.org", "@graph": [site, page]}
+    return {"@context": "https://schema.org", "@graph": [site, page, *graph_extra]}
 
 
 def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp: str | None, img_alt: str,
@@ -79,6 +87,8 @@ def head(*, title: str, desc: str, path: str, root: str, img: str | None, stamp:
   <title>{e(title)}</title>
   <meta name="description" content="{e(desc)}">
   <link rel="canonical" href="{e(url)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <script>document.documentElement.classList.add("js")</script>
   <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
   <meta property="og:type" content="website">
@@ -163,7 +173,7 @@ def league_page(league: str, S: dict | None = None) -> str:
       </div>
     </div>
   </header>
-  <main class="wrap" id="app"><div class="loading">Loading…</div></main>
+  <main class="wrap" id="app">{crawl_summary(league, S)}<div class="loading">Loading…</div></main>
   <footer class="wrap footer">
     <span>hoop2vec · {L['full']} · refreshed daily · free public data: {L['src']}</span>
     <a href="https://github.com/mkearney/hoop2vec">source</a>
@@ -174,6 +184,32 @@ def league_page(league: str, S: dict | None = None) -> str:
 </body>
 </html>
 '''
+
+
+def crawl_summary(league: str, S: dict) -> str:
+    """Today's full ratings table as plain HTML, for crawlers and AI agents that don't run JavaScript (most don't).
+    The app replaces it on load, and the "js" class hides it before then, so readers never see it flash."""
+    from .share import _load
+    r = _load(league, "ratings.json")
+    if not r or not r.get("teams"):
+        return ""
+    L, e = LEAGUES[league], html.escape
+    f = lambda v, d=1: "" if v is None else f"{v:.{d}f}"  # noqa: E731
+    sg = lambda v: "" if v is None else (lambda x: f"{'+' if x > 0 else '−' if x < 0 else ''}{abs(x):.1f}")(round(v, 1))  # noqa: E731
+    rows = "".join(
+        f"<tr><td>{t['rank']}</td><td>{e(t['team'])}</td><td>{e(t.get('conf') or '')}</td>"
+        f"<td>{t.get('wins', '')}-{t.get('losses', '')}</td><td>{sg(t.get('power'))}</td><td>{f(t.get('eff_o'))}</td>"
+        f"<td>{f(t.get('eff_d'))}</td><td>{f(t.get('adjt'))}</td><td>{sg(t.get('sos'))}</td></tr>"
+        for t in sorted(r["teams"], key=lambda t: t["rank"]))
+    pro = league in PRO_LEAGUES
+    return f'''<section class="crawl">
+    <h1>{L['name']} {"power ratings" if pro else "college basketball power ratings"}</h1>
+    <p>{e(S.get("desc", ""))}</p>
+    <p>Updated {e(str(r.get("updated", "")))}. Power is how many points per 100 possessions a team would beat an average {"team" if pro else "Division I team"} by on a neutral floor (0 = average). Offense and defense are adjusted points scored and allowed per 100 possessions, tempo is possessions per {"48" if league == "nba" else "40"} minutes, and SOS is the average Power of the opponents faced.</p>
+    <table><thead><tr><th>Rank</th><th>Team</th><th>Conf</th><th>W-L</th><th>Power</th><th>Offense</th><th>Defense</th><th>Tempo</th><th>SOS</th></tr></thead>
+    <tbody>{rows}</tbody></table>
+    <p>Data: <a href="data/ratings.json">ratings.json</a>. Method: <a href="#/method">how it works</a>.</p>
+  </section>'''
 
 
 def _top5_html(S: dict) -> str:
@@ -278,3 +314,37 @@ def write():
         d.mkdir(parents=True, exist_ok=True)
         (d / "index.html").write_text(league_page(lg, summaries.get(lg)))
     (SITE_ROOT / ".nojekyll").touch()
+    write_crawl_files(summaries)
+
+
+def write_crawl_files(summaries: dict):
+    """robots.txt, sitemap.xml (with each page's data update time) and llms.txt (a plain-text guide for AI tools)."""
+    from .share import SITE_URL
+    (SITE_ROOT / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {SITE_URL}/sitemap.xml\n")
+    pages = [("", summaries.get("home", {}))] + [(f"{lg}/", summaries.get(lg, {})) for lg in LEAGUES]
+    urls = "".join(f"  <url><loc>{SITE_URL}/{p}</loc>" + (f"<lastmod>{S['iso']}</lastmod>" if S.get("iso") else "")
+                   + "<changefreq>daily</changefreq></url>\n" for p, S in pages)
+    (SITE_ROOT / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
+                                           f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{urls}</urlset>\n')
+    lines = ["# hoop2vec", "",
+             "> Daily power ratings, game forecasts, player values and team style identities for men's and women's "
+             "college basketball, the NBA and the WNBA, built only from free public data. Every forecast uses only what "
+             "was known before tip-off, and the models are graded on seasons they never saw, against closing betting lines.",
+             "", "## Leagues", ""]
+    for lg, L in LEAGUES.items():
+        S = summaries.get(lg, {})
+        top = ", ".join(f"{t['rank']}. {t['team']}" for t in S.get("top", []))
+        lines.append(f"- [{L['name']}]({SITE_URL}/{lg}/): {L['blurb']}" + (f" Top 5 on {S['updated']}: {top}." if top else ""))
+    lines += ["", "## Data (static JSON, refreshed every morning)", ""]
+    for lg, L in LEAGUES.items():
+        base = f"{SITE_URL}/{lg}/data"
+        lines.append(f"- {L['name']}: [ratings]({base}/ratings.json) (every team: power, offense, defense, tempo, roster, "
+                     f"SOS), [players]({base}/players.json), [games]({base}/games.json) (forecasts and results), "
+                     f"[backtest]({base}/backtest.json)")
+    lines += ["", "## Definitions", "",
+              "- Power: points per 100 possessions better than an average team in the league on a neutral floor (0 = average), "
+              "from a blend of a matchup neural network and a dynamic-rating linear model.",
+              "- SOS: the average Power of the opponents a team has faced.",
+              "- Win probabilities: P(win) = Φ(predicted margin / σ), with a game-specific σ.", "",
+              "## Source", "", "- [Code and full method](https://github.com/mkearney/hoop2vec)", ""]
+    (SITE_ROOT / "llms.txt").write_text("\n".join(lines))

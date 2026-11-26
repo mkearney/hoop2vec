@@ -1,0 +1,27 @@
+# hoop2vec
+
+> Daily power ratings, game forecasts, player values and team style identities for men's and women's college basketball, the NBA and the WNBA, built only from free public data. Every forecast uses only what was known before tip-off, and the models are graded on seasons they never saw, against closing betting lines.
+
+## Leagues
+
+- [Men's](https://hoop2vec.net/mens/): Ratings, players, NBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 25, 2026: 1. Illinois, 2. Houston, 3. Connecticut, 4. Duke, 5. Florida.
+- [Women's](https://hoop2vec.net/womens/): Ratings, players, WNBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 25, 2026: 1. LSU, 2. South Carolina, 3. UConn, 4. Michigan, 5. Texas.
+- [NBA](https://hoop2vec.net/nba/): Ratings, players, forecasts and playoff odds with the play-in. Top 5 on Nov 25, 2026: 1. Spurs, 2. Celtics, 3. Rockets, 4. Timberwolves, 5. Trail Blazers.
+- [WNBA](https://hoop2vec.net/wnba/): Ratings, players, forecasts and playoff odds. Top 5 on Nov 25, 2026: 1. Dream, 2. Lynx, 3. Aces, 4. Valkyries, 5. Liberty.
+
+## Data (static JSON, refreshed every morning)
+
+- Men's: [ratings](https://hoop2vec.net/mens/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/mens/data/players.json), [games](https://hoop2vec.net/mens/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/mens/data/backtest.json)
+- Women's: [ratings](https://hoop2vec.net/womens/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/womens/data/players.json), [games](https://hoop2vec.net/womens/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/womens/data/backtest.json)
+- NBA: [ratings](https://hoop2vec.net/nba/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/nba/data/players.json), [games](https://hoop2vec.net/nba/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/nba/data/backtest.json)
+- WNBA: [ratings](https://hoop2vec.net/wnba/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/wnba/data/players.json), [games](https://hoop2vec.net/wnba/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/wnba/data/backtest.json)
+
+## Definitions
+
+- Power: points per 100 possessions better than an average team in the league on a neutral floor (0 = average), from a blend of a matchup neural network and a dynamic-rating linear model.
+- SOS: the average Power of the opponents a team has faced.
+- Win probabilities: P(win) = Φ(predicted margin / σ), with a game-specific σ.
+
+## Source
+
+- [Code and full method](https://github.com/mkearney/hoop2vec)
