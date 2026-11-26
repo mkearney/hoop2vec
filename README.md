@@ -26,23 +26,22 @@ from scratch every morning.
 
 ## How it compares
 
-An honest look at the sites people use for the same job, as of November 2026. Prices are each site's listed annual
-price.
+✅ free · 💲 paid · ❌ not offered (as of November 2026)
 
-| Site | Leagues | Price | Ratings and predictions | Players | Tournament / playoffs | Best at | Weak spots |
-|---|---|---|---|---|---|---|---|
-| **hoop2vec** | Men's and women's D-I, NBA, WNBA | Free, open source | Yes, updated as games finish | Point-in-time box plus/minus (college), RAPM-based (pros); prospect models | Exact bracket odds; playoff simulations | Four leagues in one place, free; code and backtests are public | New, with no public track record; one person; built on others' free data (ESPN, Torvik), so a source change can break it; never tested head to head against KenPom or Torvik |
-| [KenPom](https://kenpom.com) | Men's D-I | About $25 (top-line ratings free) | Yes; game predictions behind the paywall | Team-level player stats | Not a focus | The standard reference for over 20 years: media, teams, and the NCAA selection committee's team sheets all cite it | Paywall; men's only; methods described in posts, not code |
-| [Bart Torvik (T-Rank)](https://barttorvik.com) | Men's D-I since 2008; a newer women's site | Free | Yes | Deep player stats with filters and splits | TourneyCast tournament odds | The most data for free; flexible date-range and split views | Dense interface; little written methodology |
-| [EvanMiya](https://evanmiya.com) | Men's D-I since 2009 | Free core ratings; $30 or $179.99 for more | Yes; game predictions from $30 | BPR player ratings, lineup ratings, transfer portal | Bracket simulations in March | The strongest public college player and lineup metrics; used by 120+ D-I programs | The deepest tools cost $179.99; men's only |
-| [Haslametrics](https://haslametrics.com) | Men's D-I since 2014–15 | Free | Yes | None (team-level only) | Projections page | Clean, free team ratings with game predictions | No player data; men's only |
-| [ESPN BPI](https://www.espn.com/mens-college-basketball/bpi) | Men's D-I | Free | Yes | None | Tournament projections | Reach: the ratings most fans see on ESPN | Proprietary, with little detail on methods |
-| [Her Hoop Stats](https://herhoopstats.com) | Women's D-I, WNBA | Free stats; $49.99 to $199.99 for more | Full ratings and game predictions in paid tiers ($99.99 for predictions) | The deepest dedicated women's stats | Bracketology | The best home for women's basketball data | Full ratings and predictions are paid |
-| [Dunks & Threes](https://dunksandthrees.com) | NBA | $24.95; $49.95 with playoff odds | Yes (EPM-based) | EPM, one of the best public NBA player metrics | Playoff probabilities (Premium) | NBA player impact | NBA only; paid |
+| Site | Men's D-I | Women's D-I | NBA | WNBA | Team ratings | Game predictions | Player metrics | Bracket / playoff odds | Open source |
+|---|---|---|---|---|---|---|---|---|---|
+| **hoop2vec** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [KenPom](https://kenpom.com) | 💲 | ❌ | ❌ | ❌ | ✅ | 💲 | 💲 | ❌ | ❌ |
+| [Bart Torvik](https://barttorvik.com) | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| [EvanMiya](https://evanmiya.com) | ✅ | ❌ | ❌ | ❌ | ✅ | 💲 | ✅ | ✅ | ❌ |
+| [Haslametrics](https://haslametrics.com) | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| [ESPN BPI](https://www.espn.com/mens-college-basketball/bpi) | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| [Her Hoop Stats](https://herhoopstats.com) | ❌ | ✅ | ❌ | ✅ | 💲 | 💲 | ✅ | ✅ | ❌ |
+| [Dunks & Threes](https://dunksandthrees.com) | ❌ | ❌ | 💲 | ❌ | 💲 | 💲 | 💲 | 💲 | ❌ |
 
-Where hoop2vec fits: it's the only one of these that covers all four leagues for free, and the only one whose code
-and backtests are public. It hasn't earned the trust the older sites have, its college player values are simpler
-than EvanMiya's BPR or a lineup model, and a sharp sportsbook still beats it during the regular season.
+A checkmark doesn't mean equal quality. KenPom and Torvik have years of trust that hoop2vec hasn't earned, and
+hoop2vec has never been tested head to head against them. EvanMiya's college player ratings and Dunks & Threes' NBA
+ones are more sophisticated than hoop2vec's. A sharp sportsbook still beats hoop2vec during the regular season.
 
 ## Ratings and players
 
