@@ -282,7 +282,7 @@
   // ================================================================ PLAYERS
   const PCOLS = {
     overview: [["impact", "Impact", 1, `Team points per 100 possessions ${he} adds over a replacement-level player (value above replacement × minutes share)`],
-      ["value", "Value", 1, `Points per 100 possessions vs an average ${LG} player when on the floor: de-leaked box plus/minus, shrunk toward a prior`],
+      ["value", "Value", 1, `Points per 100 possessions vs an average ${LG} player when on the floor: box plus/minus measured against pre-game ratings, shrunk toward a prior`],
       ["o", "Off", 1, "Offensive part of Value"], ["d", "Def", 1, "Defensive part of Value"], ["mpg", "MPG", 1, "Minutes per game"],
       ["ppg", "PPG", 1, "Points per game (ESPN box scores)"], ["rpg", "RPG", 1], ["apg", "APG", 1], ["usg", "Usg%", 1, `Usage rate (${RATE_SRC})`],
       ["ts", "TS%", 1, `True shooting (${RATE_SRC})`], ["avail", "Avail", 0, `Chance ${he} plays next game`]],
@@ -1378,7 +1378,7 @@
           <div class="small muted" style="margin-top:6px">Best of ${x.n}${x.done ? ` · ${esc(win)} won ${Math.max(x.w_hi, x.w_lo)}–${Math.min(x.w_hi, x.w_lo)}` : " · live odds at right"}${x.p_hi_pre != null ? ` · before game 1: ${esc(x.hi)} ${pct(x.p_hi_pre)}` : ""}</div></div>`;
       }).join("")}</div>`).join("")}</div>` : "";
     const bt = d.backtest;
-    const lab = { home_court: "Home-court team wins (base rate from earlier seasons)", blend: "hoop2vec blend (live model)", net: "Matchup network", net_mmai: "Matchup network (mmai features)",
+    const lab = { home_court: "Home-court team wins (base rate from earlier seasons)", blend: "hoop2vec blend (live model)", net: "Matchup network", net_mmai: "Matchup network (core features)",
       linear: "Linear game model", kalman: "Dynamic (Kalman) rating", efficiency: "Adjusted efficiency", elo: "Elo" };
     const btHtml = bt && bt.models ? (() => {
       const ks = Object.keys(bt.models), best = Math.min(...ks.map((k) => bt.models[k].log_loss));
@@ -1430,8 +1430,7 @@
         ${table("book_line_games", "Games with a sportsbook line (DraftKings)", true)}
         ${table("consensus_line_games", "Games with an ESPN consensus line", true)}
         ${ps.length ? `<h3 style="margin-top:18px">NCAA tournament log loss by season</h3><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Season</th><th class="nosort">Games</th>${psKeys.map((k) => `<th class="nosort" title="${esc(label[k])}">${esc(short[k])}</th>`).join("")}</tr></thead><tbody>
-          ${ps.map((s) => { const m = Math.min(...psKeys.map((k) => s[k]).filter(isNum)); return `<tr><td class="l">${s.season}</td><td class="num">${s.n}</td>${psKeys.map((k) => `<td class="num ${s[k] === m ? "best" : ""}">${fmt(s[k], 3)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>` : ""}
-        ${bt.leak ? `<h3 style="margin-top:18px">Leakage check</h3><p>${bt.leak.text || ""}</p><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Feature (one-term model)</th>${bt.leak.seasons.map((s) => `<th class="nosort">${s}</th>`).join("")}</tr></thead><tbody>${bt.leak.rows.map((r) => `<tr><td class="l">${esc(r.label)}</td>${r.values.map((v) => `<td class="num">${fmt(v, 4)}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="note">Log loss on games with an ESPN line, by season; lower is better.</p>` : ""}`;
+          ${ps.map((s) => { const m = Math.min(...psKeys.map((k) => s[k]).filter(isNum)); return `<tr><td class="l">${s.season}</td><td class="num">${s.n}</td>${psKeys.map((k) => `<td class="num ${s[k] === m ? "best" : ""}">${fmt(s[k], 3)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>` : ""}`;
     }
     app.innerHTML = methodHtml(bt, btHtml);
   }
@@ -1486,7 +1485,7 @@
 
   async function viewMethodW() {
     const bt = await get("backtest.json", true);
-    const btHtml = backtestHtml(bt, "Lines are a benchmark only, never a model input. ESPN carries sportsbook lines for women's games only from 2025-26, and mostly for bigger games, so this is a small, selected sample. The model edges the line there. Women's betting markets are thinner than men's, so that's plausible, but it's exactly the symptom that exposed the men's leak, so it was checked the same way: a one-term model on the roster rating alone scores 0.404 log loss on those games, worse than the line (0.396). On the men's side, the leaky roster rating beat the line. The Kalman rating alone is level with the line.");
+    const btHtml = backtestHtml(bt, "Lines are a benchmark only, never a model input. ESPN carries sportsbook lines for women's games only from 2025-26, and mostly for bigger games, so this is a small, selected sample. The model edges the line there. Women's betting markets are thinner than men's, so that's plausible. As a sanity check, a one-term model on the roster rating alone scores 0.404 log loss on those games, worse than the line (0.396), and the Kalman rating alone is level with it.");
     app.innerHTML = `<div class="prose">
       <div class="page-head"><div><h1>How it works</h1><p class="sub">The women's site runs the same pipeline as the men's (point-in-time ratings, player values, a blended game model, exact bracket odds, team identities and WNBA prospects), rebuilt on data that is free for the women's game.</p></div>${art("mark")}</div>
       <h2>Backtest</h2>${btHtml}
@@ -1494,12 +1493,12 @@
       <ul>
         <li><b>ESPN</b> public API: every D-I game since 2019 (schedules, venues and neutral sites, NCAA seeds and rounds, conferences, logos), full box scores, and <b>play-by-play</b> (four 10-minute quarters) with full shot detail since 2020. Player heights and classes come from ESPN athlete records. Pre-game lines, where ESPN has them, are used only as a benchmark.</li>
         <li><b>basketball-reference.com</b>: WNBA seasons since 2018 and WNBA drafts since 2019 (requests spaced 6 seconds apart).</li>
-        <li>There's no free women's equivalent of barttorvik.com, so every player rate (usage, TS%, assist/rebound/block/steal rates, box plus/minus) is computed here from ESPN box scores. There's no free injury feed either: availability comes from recent missed games plus a hand-edited <code>overrides/womens/injuries.yaml</code>.</li>
+        <li>No women's Torvik feed is used, so every player rate (usage, TS%, assist/rebound/block/steal rates, box plus/minus) is computed here from ESPN box scores. There's no free injury feed either: availability comes from recent missed games plus a hand-edited <code>overrides/womens/injuries.yaml</code>.</li>
       </ul>
       <h2>2 · Ratings</h2>
       <p>The same two engines as the men's site. A <b>dynamic Kalman rating</b> tracks each team's offense, defense and tempo after every game, carrying over between seasons by returning minutes. <b>Adjusted efficiency</b> is a recency-weighted ridge regression re-solved before every game day. Elo is kept as a baseline. Possessions use the same 0.475·FTA estimate, and tempo is per 40 minutes.</p>
       <h2>3 · Players</h2>
-      <p>Player value is a box plus/minus fitted for the women's game: each game's opponent-adjusted team offensive and defensive efficiency (vs the opponent's <i>pre-game</i> Kalman rating, so nothing from the future leaks in) is regressed on the team's minute-weighted per-40 box-score rates. A player's value is her share of that fit, plus the team residual, in the same points-per-100 units as the men's site. Values are shrunk toward a prior (last season, class) until minutes pile up, and roster strength is Σ minutes share × value.</p>
+      <p>Player value is a box plus/minus fitted for the women's game: each game's opponent-adjusted team offensive and defensive efficiency (vs the opponent's <i>pre-game</i> Kalman rating, so it uses only what was known before tip-off) is regressed on the team's minute-weighted per-40 box-score rates. A player's value is her share of that fit, plus the team residual, in the same points-per-100 units as the men's site. Values are shrunk toward a prior (last season, class) until minutes pile up, and roster strength is Σ minutes share × value.</p>
       <h2>4 · Team identity</h2>
       <p>Play-by-play style rates (transition, shot zones, assisted shares, turnover types, putbacks and more) are opponent- and venue-adjusted, strength is regressed out, and factor analysis plus a Gaussian mixture give named dimensions and soft archetypes. The women's style model is fitted on women's play-by-play (2020–21 onward, about 2,000 team-seasons). Where its dimensions match the men's (most do, closely), the men's names carry over; the archetypes were named by hand from their own profiles.</p>
       <h2>5 · The game model</h2>
@@ -1517,7 +1516,7 @@
 
   function methodHtml(bt, btHtml) {
     return `<div class="prose">
-      <div class="page-head"><div><h1>How it works</h1><p class="sub">Public data → point-in-time ratings, players and styles → a blended game model → ratings, forecasts and the bracket. hoop2vec merges two earlier projects (mmai and mmkm), keeping the better piece wherever they overlapped.</p></div>${art("mark")}</div>
+      <div class="page-head"><div><h1>How it works</h1><p class="sub">Public data → point-in-time ratings, players and styles → a blended game model → ratings, forecasts and the bracket.</p></div>${art("mark")}</div>
       <h2>Backtest</h2>${btHtml}
       <h2>1 · Data (free and public)</h2>
       <ul>
@@ -1526,17 +1525,16 @@
         <li><b>Covers.com and Rotowire</b> injury reports, plus a hand-edited <code>overrides/injuries.yaml</code>.</li>
       </ul>
       <h2>2 · Ratings</h2>
-      <p>Two complementary engines, both strictly point-in-time. A <b>dynamic Kalman rating</b> (from mmkm) tracks each team's offense, defense and tempo with an uncertainty. It updates after every game, caps blowouts, and carries over between seasons according to returning minutes and transfers. <b>Adjusted efficiency</b> (from mmai) is a recency-weighted ridge regression re-solved before every game day. It gives AdjO/AdjD/AdjEM/tempo and opponent-adjusted four factors, anchored by a preseason prior from last season and the incoming roster. Elo is kept as a baseline.</p>
+      <p>Two complementary engines, both strictly point-in-time. A <b>dynamic Kalman rating</b> tracks each team's offense, defense and tempo with an uncertainty. It updates after every game, caps blowouts, and carries over between seasons according to returning minutes and transfers. <b>Adjusted efficiency</b> is a recency-weighted ridge regression re-solved before every game day. It gives AdjO/AdjD/AdjEM/tempo and opponent-adjusted four factors, anchored by a preseason prior from last season and the incoming roster. Elo is kept as a baseline.</p>
       <h2>3 · Players and availability</h2>
-      <p>Player values blend a prior (last season, class progression, recruiting rank) with this season's minute-weighted game impact. Roster strength = Σ minutes share × value. Ratings already reflect the roster that played, so the injury adjustment is <code>Σ (availability now − usual participation) × share × (value − replacement)</code>. Live availability comes from the injury feeds, recent missed games and the overrides file.</p>
-      <p><b>Leakage removed.</b> Torvik's per-game player values are, at team level, almost exactly (R² 0.998) half the game's raw box-score margin plus about half the team's <i>own end-of-season</i> rating, plus an opponent adjustment that also uses <i>end-of-season</i> ratings. Summed over a roster, they told the old model in November how good a team would be in March. hoop2vec re-bases every game value on pre-game Kalman ratings, so end-of-season ratings get ≈0 weight. The preseason prior used each player's full-season minutes; it now uses a typical rotation curve assigned by prior value. Before the fix, a one-term roster rating beat the betting line in every season. After it, it trails the line, as an honest rating should (table above).</p>
+      <p>Player values blend a prior (last season, class progression, recruiting rank) with this season's minute-weighted game impact. Each game's value is measured against pre-game team ratings, so it uses only what was known at tip-off. Roster strength = Σ minutes share × value. Ratings already reflect the roster that played, so the injury adjustment is <code>Σ (availability now − usual participation) × share × (value − replacement)</code>. Live availability comes from the injury feeds, recent missed games and the overrides file.</p>
       <h2>4 · Team identity</h2>
-      <p>From mmkm. About 32 play-by-play style rates (transition after steals, rebounds and makes, shot zones, pull-up and isolation proxies, assisted shares, late-clock shots, turnover types, blocks, fouls drawn, putbacks) are opponent- and venue-adjusted with empirical-Bayes shrinkage. Team strength is regressed out, then varimax factor analysis gives named offensive, defensive and personnel dimensions. A Gaussian mixture gives soft archetypes. Cards add evidence, strengths, vulnerabilities and matchup notes.</p>
+      <p>About 32 play-by-play style rates (transition after steals, rebounds and makes, shot zones, pull-up and isolation proxies, assisted shares, late-clock shots, turnover types, blocks, fouls drawn, putbacks) are opponent- and venue-adjusted with empirical-Bayes shrinkage. Team strength is regressed out, then varimax factor analysis gives named offensive, defensive and personnel dimensions. A Gaussian mixture gives soft archetypes. Cards add evidence, strengths, vulnerabilities and matchup notes.</p>
       <h2>5 · The game model</h2>
       <p>Two models, blended on the margin scale with a weight chosen by the backtest:</p>
-      <ul><li>the <b>matchup network</b> (from mmai): an antisymmetric PyTorch model. Each team's ~40 features (both ratings, four factors O/D, roster, Elo, form, availability, rest, travel) are encoded into an embedding, and a pair head scores <code>[A, B, A⊙B, context]</code> so style interactions can matter. A second head predicts game-specific σ. It's a 5-seed ensemble.</li>
-      <li>the <b>linear game model</b> (from mmkm): a regularized antisymmetric regression on the Kalman margin, the snapshot AdjEM margin, home court, travel (log-miles difference), rest and availability, with σ scaling with expected possessions.</li></ul>
-      <p>Margins blend as <code>w·network + (1−w)·linear</code> with mixture variance, and P(win) = Φ(margin/σ). The Matchup Lab shows the decomposition. mmkm's research found PBP style factors add only ~0.001 log loss on all games and nothing measurable in March. So identities stay descriptive, and the network's box-score style inputs carry the matchup effects.</p>
+      <ul><li>the <b>matchup network</b>: an antisymmetric PyTorch model. Each team's ~40 features (both ratings, four factors O/D, roster, Elo, form, availability, rest, travel) are encoded into an embedding, and a pair head scores <code>[A, B, A⊙B, context]</code> so style interactions can matter. A second head predicts game-specific σ. It's a 5-seed ensemble.</li>
+      <li>the <b>linear game model</b>: a regularized antisymmetric regression on the Kalman margin, the snapshot AdjEM margin, home court, travel (log-miles difference), rest and availability, with σ scaling with expected possessions.</li></ul>
+      <p>Margins blend as <code>w·network + (1−w)·linear</code> with mixture variance, and P(win) = Φ(margin/σ). The Matchup Lab shows the decomposition. Play-by-play style factors add only ~0.001 log loss on all games and nothing measurable in March. So identities stay descriptive, and the network's box-score style inputs carry the matchup effects.</p>
       <h2>6 · Power ratings</h2>
       <p>Power is the blended model's round-robin on a neutral floor: each team's average predicted margin <b>per 100 possessions against the top-100 teams</b>, re-centered so 0 = an average D-I team. It's tempo-neutral and measured against tournament-calibre opposition, not by how badly a team beats the weakest D-I teams. Re-centering shifts every team equally, so ranks, gaps between teams and forecasts don't change. Strength of schedule is the average Power of the opponents faced, so 0 is an average D-I schedule.</p>
       <h2>7 · Bracket</h2>

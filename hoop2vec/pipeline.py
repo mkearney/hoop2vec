@@ -152,8 +152,8 @@ def stage_train(feat, n_models=TR.N_MODELS):
 
 MODEL_LABELS = {
     "seed": ("Seed difference", "Seed"), "elo": ("Elo", "Elo"), "efficiency": ("Adjusted efficiency (AdjEM)", "AdjEM"),
-    "kalman": ("Dynamic (Kalman) rating", "Kalman"), "linear": ("Linear game model (mmkm)", "Linear"),
-    "net_mmai": ("Matchup network, mmai features", "Net (mmai)"), "net": ("Matchup network (all features)", "Net"),
+    "kalman": ("Dynamic (Kalman) rating", "Kalman"), "linear": ("Linear game model", "Linear"),
+    "net_mmai": ("Matchup network, core features", "Net (core)"), "net": ("Matchup network (all features)", "Net"),
     "blend": ("hoop2vec blend", "Blend"),
 }
 
@@ -224,14 +224,10 @@ def publish_backtest(res, P, names):
         for k in names:
             row[k] = BT.log_loss(d["margin"] > 0, d[f"p_{k}"])
         per.append(row)
-    leak = None
-    lf = ARTIFACTS / "leak_check.json"
-    if lf.exists():
-        leak = json.loads(lf.read_text())
     write_json("backtest.json", {
         "seasons": [int(P["season"].min()), int(P["season"].max())], "final": "blend",
         "models": [{"key": k, "label": MODEL_LABELS.get(k, (k, k))[0], "short": MODEL_LABELS.get(k, (k, k))[1]} for k in names],
-        "subsets": res, "per_season": per, "leak": leak})
+        "subsets": res, "per_season": per})
 
 
 # ------------------------------------------------------------------------ model bundle
@@ -520,7 +516,7 @@ def _espn_box(season, st) -> pd.DataFrame:
 
 def write_players(st, live, pg, inj_report, season):
     """players.json: every D-I player this season. Model value/impact/availability + ESPN per-game box stats +
-    Torvik's advanced rates. Value is the de-leaked, prior-shrunk box plus/minus (pts per 100 vs an average D-I
+    Torvik's advanced rates. Value is the point-in-time, prior-shrunk box plus/minus (pts per 100 vs an average D-I
     player); impact = minutes share x (value - replacement), i.e. what he adds to his team's rating per 100."""
     from .sources.injuries import norm_name
     names = pg[pg["season"] == season].drop_duplicates("pid", keep="last").set_index("pid")
