@@ -1480,7 +1480,7 @@
       <h2>7 · Playoffs</h2>
       <p>College basketball ends in a bracket; the pros play long seasons into seeded best-of-N series, so the forecast plays out the rest of the regular season ${L === "NBA" ? "and the play-in " : ""}${(10000).toLocaleString()} times, applies the tiebreakers, and solves each series exactly from its home and away game probabilities. Every past playoff series was predicted before game 1 by models trained only on earlier seasons and scored against the result. Details are on the <a href="#/playoffs">Playoffs</a> page.</p>
       <h2>Refresh</h2>
-      <p>The same GitHub Action runs <code>python -m hoop2vec daily --${LEAGUE}</code> every morning and retrains monthly. The site is static JSON.</p>
+      <p>The same GitHub Action runs <code>python -m hoop2vec daily --${LEAGUE}</code> every morning and retrains monthly. In between, a lighter job checks ESPN for finished games every 10 minutes. When there are new ones, <code>python -m hoop2vec live --${LEAGUE}</code> fetches just those games and re-publishes the ratings, forecasts, standings, and playoff odds. Past seasons come from a cache, so nothing is re-scraped. The site is static JSON.</p>
     </div>`;
   }
 
@@ -1511,7 +1511,7 @@
       <h2>8 · WNBA prospects</h2>
       <p>A draft model (P picked in the top 4, 12 or 24, or at all, in the three-round April draft) and a WNBA success model (P of 2.5+ Win Shares in the first three WNBA seasons, starting the summer of the draft), with college comps and "plays like" WNBA comps from a translation model. Trained on every D-I player-season since 2019 and checked against real drafts and careers. Details are on the <a href="#/prospects">Prospects</a> page.</p>
       <h2>Refresh</h2>
-      <p>The same GitHub Action runs <code>python -m hoop2vec daily --womens</code> every morning in season and retrains monthly. The site is static JSON.</p>
+      <p>The same GitHub Action runs <code>python -m hoop2vec daily --womens</code> every morning in season and retrains monthly. In between, a lighter job checks ESPN for finished games every 10 minutes. When there are new ones, <code>python -m hoop2vec live --womens</code> fetches just those games and re-publishes the ratings, forecasts, bracket, and team and player pages (prospect boards wait for the morning run). Past seasons come from a cache, so nothing is re-scraped. The site is static JSON.</p>
     </div>`;
   }
 
@@ -1544,7 +1544,7 @@
       <h2>8 · NBA prospects</h2>
       <p>A draft model (P picked in the top 5/14/30/60 this June) and an NBA success model (P of 8+ Win Shares in the first four NBA seasons), trained on every D-I player-season since 2008, with NBA careers from basketball-reference.com. Both are checked against real drafts and careers they never saw. Details and backtests are on the <a href="#/prospects">Prospects</a> page.</p>
       <h2>Refresh</h2>
-      <p>A GitHub Action runs <code>python -m hoop2vec daily</code> every morning in season and retrains monthly (<code>python -m hoop2vec all</code>). The site is static JSON plus this page.</p>
+      <p>A GitHub Action runs <code>python -m hoop2vec daily</code> every morning in season and retrains monthly (<code>python -m hoop2vec all</code>). In between, a lighter job checks ESPN for finished games every 10 minutes. When there are new ones, <code>python -m hoop2vec live</code> fetches just those games and re-publishes the ratings, forecasts, bracket, and team and player pages (prospect boards wait for the morning run). Past seasons come from a cache, so nothing is re-scraped. The site is static JSON plus this page.</p>
     </div>`;
   }
 

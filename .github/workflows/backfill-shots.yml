@@ -68,3 +68,12 @@ jobs:
           git diff --cached --quiet || git commit -m "Backfill shot locations ($LEAGUE $SEASONS)"
           git pull --rebase --autostash
           git push
+
+  deploy:                      # Pages deploys from Actions (pages.yml): publish what was just committed
+    needs: backfill
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

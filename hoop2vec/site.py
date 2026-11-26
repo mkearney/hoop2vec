@@ -229,7 +229,7 @@ def _top5_html(S: dict) -> str:
         f'<span>{t["rank"]}. {e(t["team"])}</span></span>' for t in S["top"])
 
 
-HOW = [("vector", "Ratings", "Every team is a vector of offense, defense and tempo, re-solved each morning from the games so far."),
+HOW = [("vector", "Ratings", "Every team is a vector of offense, defense, and tempo, re-solved from the games so far as each one finishes."),
        ("neural", "Matchup network", "A neural network learns team embeddings and scores how any two teams fit together."),
        ("latent", "Team identities", "Factor analysis places every team in a style space and names its archetype."),
        ("arc", "Forecasts", "Each game gets a margin and a win probability, graded on seasons the model never saw.")]
@@ -268,7 +268,7 @@ def chooser_page(summaries: dict | None = None) -> str:
     <section class="choose-hero">
       {brand.mark("hero-mark")}
       <h1>Basketball ratings and forecasts</h1>
-      <p class="sub">Every team in men's and women's Division I, the NBA and the WNBA gets a new rating each morning. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
+      <p class="sub">Every team in men's and women's Division I, the NBA, and the WNBA gets a new rating soon after each of its games ends. The same models forecast games, value players and price out the 2027 NCAA tournaments and the pro playoffs. All of it runs on free public data. Each forecast uses only what was known before tip-off, and the models are graded on seasons they never saw.</p>
     </section>
     <section class="choices">{cards}
     </section>
@@ -330,7 +330,7 @@ def write_crawl_files(summaries: dict):
     (SITE_ROOT / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {SITE_URL}/sitemap.xml\n")
     pages = [("", summaries.get("home", {}))] + [(f"{lg}/", summaries.get(lg, {})) for lg in LEAGUES]
     urls = "".join(f"  <url><loc>{SITE_URL}/{p}</loc>" + (f"<lastmod>{S['iso']}</lastmod>" if S.get("iso") else "")
-                   + "<changefreq>daily</changefreq></url>\n" for p, S in pages)
+                   + "<changefreq>hourly</changefreq></url>\n" for p, S in pages)
     (SITE_ROOT / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
                                            f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{urls}</urlset>\n')
     lines = ["# hoop2vec", "",
@@ -342,7 +342,7 @@ def write_crawl_files(summaries: dict):
         S = summaries.get(lg, {})
         top = ", ".join(f"{t['rank']}. {t['team']}" for t in S.get("top", []))
         lines.append(f"- [{L['name']}]({SITE_URL}/{lg}/): {L['blurb']}" + (f" Top 5 on {S['updated']}: {top}." if top else ""))
-    lines += ["", "## Data (static JSON, refreshed every morning)", ""]
+    lines += ["", "## Data (static JSON, rebuilt every morning and updated as games finish)", ""]
     for lg, L in LEAGUES.items():
         base = f"{SITE_URL}/{lg}/data"
         lines.append(f"- {L['name']}: [ratings]({base}/ratings.json) (every team: power, offense, defense, tempo, roster, "

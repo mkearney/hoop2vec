@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import memo
 from . import players as PL
 from .config import PROC, current_season, today
 from .ratings import efficiency as EF
@@ -70,6 +71,33 @@ def _final_ratings(rows_by_season, teams_by_season, priors_by_season=None):
     return out
 
 
+class _StoredSnaps:
+    """The last run's snapshots.parquet: a completed season's rating snapshots are reused when they were computed
+    from the same inputs (the input hash of each season is stored in the file's metadata), which gives exactly what
+    recomputing would. Read only when a season can be reused."""
+
+    def __init__(self, path=None):
+        self.path = path or PROC / "snapshots.parquet"
+        self.keys, self.df = {}, None
+        try:
+            import json
+
+            import pyarrow.parquet as pq
+            meta = pq.read_schema(self.path).metadata or {}
+            attrs = json.loads(meta.get(b"PANDAS_ATTRS", b"{}"))
+            self.keys = attrs.get("snap_keys") or {}
+        except Exception:  # no previous file (fresh cache) or an older one without keys
+            self.keys = {}
+
+    def has(self, season, key) -> bool:
+        return self.keys.get(str(season)) == key
+
+    def season(self, season) -> pd.DataFrame:
+        if self.df is None:
+            self.df = pd.read_parquet(self.path)
+        return self.df[self.df["season"] == season].drop(columns="season").reset_index(drop=True)
+
+
 def fit_priors(final: dict, roster0: pd.DataFrame):
     """Fit how last season's ratings + current roster predict this season's final ratings."""
     recs = []
@@ -78,15 +106,15 @@ def fit_priors(final: dict, roster0: pd.DataFrame):
             continue
         prev = final[s - 1].set_index("team")
         cur = f.set_index("team")
-        for t in cur.index:
-            row = {"season": s, "team": t}
-            for st in EF.STATS:
-                for side in ("o", "d"):
-                    c = f"{st}_{side}"
-                    row[c] = cur.at[t, c] - cur[c].mean()
-                    row[f"prev_{c}"] = (prev.at[t, c] - prev[c].mean()) if t in prev.index else np.nan
-            recs.append(row)
-    d = pd.DataFrame(recs).merge(roster0, on=["season", "team"], how="left")
+        prev = prev[~prev.index.duplicated()]
+        row = {"season": s, "team": cur.index.to_numpy()}
+        for st in EF.STATS:
+            for side in ("o", "d"):
+                c = f"{st}_{side}"
+                row[c] = (cur[c] - cur[c].mean()).to_numpy()
+                row[f"prev_{c}"] = (prev[c] - prev[c].mean()).reindex(cur.index).to_numpy()
+        recs.append(pd.DataFrame(row))
+    d = pd.concat(recs, ignore_index=True).merge(roster0, on=["season", "team"], how="left")
     coefs = {}
     for st in EF.STATS:
         for side in ("o", "d"):
@@ -168,6 +196,8 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
     final0 = _final_ratings(rows_by, teams_by)
     coefs = fit_priors({s: f for s, f in final0.items() if s < current_season()}, roster0)
     snaps = []
+    snap_keys = {}
+    stored = _StoredSnaps()
     priors_used = {}
     for s in seasons:
         teams = teams_by[s]
@@ -181,11 +211,16 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
         rows = rows_by.get(s)
         if rows is None or rows.empty:
             continue
-        sn = EF.season_snapshots(rows, teams, prior, list(dates) + extra, prior_games=prior_games)
+        snap_dates = list(dates) + extra
+        k = memo.key(rows, teams, prior, snap_dates, prior_games)
+        reuse = s < current_season() and stored.has(s, k)  # completed season, same inputs as the last run
+        sn = stored.season(s) if reuse else EF.season_snapshots(rows, teams, prior, snap_dates, prior_games=prior_games)
         sn["season"] = s
         snaps.append(sn)
-        print(f"  ratings {s}: {len(dates)} snapshots", flush=True)
+        snap_keys[str(s)] = k
+        print(f"  ratings {s}: {len(dates)} snapshots" + (" (unchanged, from the last run)" if reuse else ""), flush=True)
     snaps = pd.concat(snaps, ignore_index=True)
+    snaps.attrs["snap_keys"] = snap_keys  # saved with snapshots.parquet, so the next run can reuse these seasons
 
     # --- elo
     elo_g, elo_final = ELO.run(g)

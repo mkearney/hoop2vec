@@ -128,6 +128,11 @@ def _cities() -> dict:
 
 def geocode(city, state) -> tuple[float, float] | None:
     c, s = _norm(city), _norm(state)
+    return _geocode(c, s)
+
+
+@lru_cache(maxsize=None)  # the games table asks for the same few thousand venues ~100k times
+def _geocode(c: str, s: str) -> tuple[float, float] | None:
     if s in (x.lower() for x in STATE_ABBR):
         s = STATE_ABBR[next(k for k in STATE_ABBR if k.lower() == s)].lower()
     if (c, s) in MANUAL:

@@ -1,4 +1,4 @@
-"""CLI: python -m hoop2vec [daily|train|backtest|all|publish|offline|history|ingest SEASONS|site] [--mens|--womens|--nba|--wnba]
+"""CLI: python -m hoop2vec [daily|live|train|backtest|all|publish|offline|history|ingest SEASONS|site] [--mens|--womens|--nba|--wnba]
 
 --mens (default) / --womens picks the league: data/<league>, artifacts/<league>, docs/<league>.
 
@@ -8,6 +8,8 @@ backtest  same + rerun the season-ahead backtest (re-chooses the blend weight)
 all       train + backtest + publish
 publish   re-export the site from cached features (fast)
 offline   like daily, but without any network refresh (uses local caches)
+live      daily as games finish during the day: only new games, completed seasons from the cache, no prospects;
+          keeps the league's site data under live/ for the Pages deploy (see hoop2vec/live.py)
 history   after a season ends: refresh the committed history/ bundle
 ingest    play-by-play ingest for seasons, e.g. `ingest 2015-2026` (needed to refit identities)
 shots     one-time backfill of shot locations for seasons ingested before they were kept, e.g. `shots 2008-2026`
@@ -49,6 +51,10 @@ if __name__ == "__main__":
         a, _, b = arg.partition("-")
         for s in range(int(a), int(b or a) + 1):
             ingest_season(s, shots=True) if mode == "shots" else ingest_season(s)
+        raise SystemExit(0)
+    if mode == "live":
+        from .live import run as live_run
+        live_run()
         raise SystemExit(0)
     if mode not in ("daily", "train", "backtest", "all", "publish", "offline"):
         raise SystemExit(__doc__)

@@ -53,3 +53,12 @@ jobs:
           git diff --cached --quiet || git commit -m "Retrain + backtest (${{ matrix.league }}) $(date -u +%F)"
           git pull --rebase --autostash
           git push
+
+  deploy:                      # Pages deploys from Actions (pages.yml): publish what was just committed
+    needs: retrain
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

@@ -99,14 +99,14 @@ def _fact(no1: str, fav: str, p: float) -> str:
 
 
 def _desc(league: str, fact: str | None) -> str:
-    base = {"mens": "Men's college basketball power ratings, game forecasts, player values, NBA prospects and 2027 "
-                    "NCAA tournament odds, updated every morning.",
-            "womens": "Women's college basketball power ratings, game forecasts, player values, WNBA prospects and "
-                      "2027 NCAA tournament odds, updated every morning.",
-            "nba": "NBA power ratings, game forecasts, player values and playoff odds, updated every morning.",
-            "wnba": "WNBA power ratings, game forecasts, player values and playoff odds, updated every morning.",
-            "home": "Power ratings, game forecasts and player values for men's and women's college basketball, the "
-                    "NBA and the WNBA, updated every morning from free public data."}[league]
+    base = {"mens": "Men's college basketball power ratings, game forecasts, player values, NBA prospects, and 2027 "
+                    "NCAA tournament odds, updated as games finish.",
+            "womens": "Women's college basketball power ratings, game forecasts, player values, WNBA prospects, and "
+                      "2027 NCAA tournament odds, updated as games finish.",
+            "nba": "NBA power ratings, game forecasts, player values, and playoff odds, updated as games finish.",
+            "wnba": "WNBA power ratings, game forecasts, player values, and playoff odds, updated as games finish.",
+            "home": "Power ratings, game forecasts, and player values for men's and women's college basketball, the "
+                    "NBA, and the WNBA, updated as games finish, from free public data."}[league]
     return f"{base} {fact}" if fact else base
 
 
