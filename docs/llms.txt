@@ -5,11 +5,11 @@
 ## Leagues
 
 - [Men's](https://hoop2vec.net/mens/): Ratings, players, NBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 26, 2026: 1. Illinois, 2. Houston, 3. Duke, 4. Florida, 5. Gonzaga.
-- [Women's](https://hoop2vec.net/womens/): Ratings, players, WNBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 25, 2026: 1. LSU, 2. South Carolina, 3. UConn, 4. Michigan, 5. Texas.
-- [NBA](https://hoop2vec.net/nba/): Ratings, players, forecasts and playoff odds with the play-in. Top 5 on Nov 25, 2026: 1. Spurs, 2. Celtics, 3. Rockets, 4. Timberwolves, 5. Trail Blazers.
-- [WNBA](https://hoop2vec.net/wnba/): Ratings, players, forecasts and playoff odds. Top 5 on Nov 25, 2026: 1. Dream, 2. Lynx, 3. Aces, 4. Valkyries, 5. Liberty.
+- [Women's](https://hoop2vec.net/womens/): Ratings, players, WNBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 26, 2026: 1. LSU, 2. Michigan, 3. South Carolina, 4. UConn, 5. Texas.
+- [NBA](https://hoop2vec.net/nba/): Ratings, players, forecasts and playoff odds with the play-in. Top 5 on Nov 26, 2026: 1. Celtics, 2. Rockets, 3. Knicks, 4. Timberwolves, 5. Thunder.
+- [WNBA](https://hoop2vec.net/wnba/): Ratings, players, forecasts and playoff odds. Top 5 on Nov 26, 2026: 1. Dream, 2. Lynx, 3. Aces, 4. Valkyries, 5. Liberty.
 
-## Data (static JSON, refreshed every morning)
+## Data (static JSON, rebuilt every morning and updated as games finish)
 
 - Men's: [ratings](https://hoop2vec.net/mens/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/mens/data/players.json), [games](https://hoop2vec.net/mens/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/mens/data/backtest.json)
 - Women's: [ratings](https://hoop2vec.net/womens/data/ratings.json) (every team: power, offense, defense, tempo, roster, SOS), [players](https://hoop2vec.net/womens/data/players.json), [games](https://hoop2vec.net/womens/data/games.json) (forecasts and results), [backtest](https://hoop2vec.net/womens/data/backtest.json)
