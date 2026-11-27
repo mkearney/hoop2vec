@@ -333,9 +333,12 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report, 
         ptsg = st["power"].reindex(up["team_a"]).to_numpy() - st["power"].reindex(up["team_b"]).to_numpy()
         neutral = PR.predict_pairs(bundle, state, up[["team_a", "team_b"]].assign(loc=0))
         up["edge"] = neutral["margin"].to_numpy() - ptsg * up["poss_exp"].to_numpy() / 100
-    recent, acc = season_tracking(feat, season, bundle)
-    gcols = ["date", "team_a", "team_b", "loc", "city", "p_a", "margin", "pts_a", "pts_b", "edge"]
+    starts = start_times(season, gcur)  # tip-off times: the site shows them in each visitor's time zone
+    recent, acc = season_tracking(feat, season, bundle, starts)
+    gcols = ["date", "start", "team_a", "team_b", "loc", "city", "p_a", "margin", "pts_a", "pts_b", "edge"]
     soon = up[up["date"] <= pd.Timestamp(today()) + pd.Timedelta(days=7)] if len(up) else up
+    if len(soon):
+        soon = soon.assign(start=soon["gid"].map(starts))
     upcoming = records(soon[gcols].sort_values("date")) if len(soon) else []
     write_json("games.json", {"upcoming": upcoming, "recent": recent[-500:], "season_accuracy": acc})
 
@@ -392,7 +395,24 @@ def stage_prospects(refresh=False, backtest=False):
         log(f"  prospects skipped: {e!r}")
 
 
-def season_tracking(feat, season, bundle):
+def start_times(season: int, games: pd.DataFrame) -> dict:
+    """gid -> scheduled start (UTC ISO, e.g. "2026-11-27T00:30Z") from this season's ESPN scoreboards. Games with no
+    ESPN match, or a start time ESPN lists as TBD, are left out (the site then shows the date alone)."""
+    try:
+        e = pd.read_parquet(PROC / f"espn_games_{season}.parquet")
+    except Exception:
+        return {}
+    if "start" not in e.columns or "event_id" not in games.columns:
+        return {}
+    ok = e["start"].notna()
+    if "time_valid" in e.columns:
+        ok &= e["time_valid"].astype(str) != "False"
+    by_event = dict(zip(e.loc[ok, "event_id"].astype(str), e.loc[ok, "start"].astype(str)))
+    g = games[games["event_id"].notna()]
+    return {gid: by_event[str(ev)] for gid, ev in zip(g["gid"], g["event_id"]) if str(ev) in by_event}
+
+
+def season_tracking(feat, season, bundle, starts: dict | None = None):
     """This season's played games with the forecast the model would have made the day before."""
     from . import lines as L
     f = BT.add_derived(feat[(feat["season"] == season) & feat["played"]])
@@ -402,7 +422,8 @@ def season_tracking(feat, season, bundle):
     mu, sg, p, _ = PR.blend_predict(bundle, f)
     f["pred_margin"], f["p_a"] = mu, p
     f = f.sort_values("date")
-    recent = records(f[["date", "team_a", "team_b", "loc", "pts_a", "pts_b", "p_a", "pred_margin"]])
+    f["start"] = f["gid"].map(starts or {}) if "gid" in f.columns else None
+    recent = records(f[["date", "start", "team_a", "team_b", "loc", "pts_a", "pts_b", "p_a", "pred_margin"]])
     y = f["margin"].to_numpy() > 0
     acc = {"n": int(len(f)), "accuracy": float(np.mean((f["p_a"] > 0.5) == y)), "log_loss": BT.log_loss(y, f["p_a"]),
            "mae": float(np.mean(np.abs(f["margin"] - f["pred_margin"])))}

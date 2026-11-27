@@ -35,6 +35,7 @@ def _compact(ev: dict, qdate: dt.date) -> dict | None:
         "event_id": str(ev.get("id")),
         "date": qdate.isoformat(),
         "start": ev.get("date"),
+        "time_valid": c.get("timeValid"),  # False = start time TBD (ESPN parks those at midnight Eastern)
         "season": (ev.get("season") or {}).get("year"),
         "season_type": (ev.get("season") or {}).get("type"),
         "neutral": bool(c.get("neutralSite")),

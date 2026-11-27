@@ -228,21 +228,18 @@ def render_home(summaries: dict, path: Path):
 
 
 def render_icons(out_dir: Path):
-    """PNG icons for the platforms that ignore SVG favicons (iOS home screen, older browsers)."""
-    from PIL import Image, ImageDraw
+    """PNG icons for the platforms that ignore SVG favicons (iOS home screen, Safari, older browsers): the logo
+    mark alone on a transparent background, seams cut out, like the SVG favicon."""
+    from PIL import Image
     for name, size in (("apple-touch-icon.png", 180), ("icon-512.png", 512), ("icon-32.png", 32)):
         f = out_dir / name
         if f.exists():
             continue
-        # a light tile (rounded except for iOS, which rounds it itself) so the dark brackets read on any background
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        if name.startswith("apple"):
-            img.paste(Image.new("RGBA", (size, size), C["bg"]))
-        else:
-            ImageDraw.Draw(img).rounded_rectangle((0, 0, size - 1, size - 1), radius=round(size * .22), fill=C["bg"])
-        h = round(size * (0.56 if size > 32 else 0.62))
+        h = round(size * 0.70)
         w = round(h * 102 / 76)
-        _mark(img, (size - w) / 2, (size - h) / 2, h)
+        from .brand import draw_mark
+        draw_mark(img, (size - w) / 2, (size - h) / 2, h, ink=C["text"], ball=C["hot"], cut=None)
         img.save(f, optimize=True)
 
 

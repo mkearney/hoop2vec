@@ -262,6 +262,17 @@ ul.clean li.empty::before { content: ""; }
 .game.featured { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface));
   box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
 .g-foot { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.g-time { color: var(--text-2); font-weight: 600; }
+/* finals stay on the schedule (score, winner checked) until the day rolls over */
+.game.final { background: var(--surface-2); border-style: dashed; box-shadow: none; }
+.game.final.featured { box-shadow: inset 3px 0 0 var(--accent); }
+.game.final .prob { opacity: .35; }
+.game.final .g-team b { font-size: 15px; }
+.g-team.won a, .g-team.won b { font-weight: 800; color: var(--text); }
+.g-team.lost a, .g-team.lost b { color: var(--text-3); font-weight: 500; }
+.g-team.lost > :first-child { opacity: .5; }
+.win-check { color: var(--good); font-weight: 800; }
+.pill.final-pill { background: var(--text); color: var(--bg); text-transform: uppercase; letter-spacing: .05em; font-size: 10.5px; }
 h2.day { margin: 22px 0 10px; font-size: 16px; }
 .res-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 64px minmax(0, 1fr) 92px; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .res-row:last-child { border-bottom: 0; }

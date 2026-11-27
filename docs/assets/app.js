@@ -52,6 +52,13 @@
   // logo mark and spot art: <template id="art-*"> in the page shell (hoop2vec/brand.py), colored by theme tokens
   const art = (k, cls = "") => { const t = document.getElementById("art-" + k); return t ? (cls ? t.innerHTML.replace('class="art spot"', `class="art spot ${cls}"`) : t.innerHTML) : ""; };
   const locWord = (l) => (l > 0 ? "vs" : l < 0 ? "@" : "N");
+  // game times in the visitor's own time zone (Eastern, Detroit, when the browser doesn't say)
+  const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Detroit"; } catch (e) { return "America/Detroit"; } })();
+  const inTZ = (d, opts, f = "toLocaleTimeString") => { try { return d[f](undefined, { ...opts, timeZone: TZ }); } catch (e) { return d[f](undefined, { ...opts, timeZone: "America/Detroit" }); } };
+  const timeFmt = (iso) => { const d = new Date(iso); return iso && !isNaN(d) ? inTZ(d, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : ""; };
+  const dayKey = (d) => { const p = {}; new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).formatToParts(d).forEach((x) => (p[x.type] = x.value)); return `${p.year}-${p.month}-${p.day}`; };
+  const gameDay = (x) => (x.start && !isNaN(new Date(x.start)) ? dayKey(new Date(x.start)) : x.date);  // local calendar day of tip-off
+  const boardDay = () => dayKey(new Date(Date.now() - 4 * 3600e3));  // "today" on the Games page rolls over at 4 a.m., so late finals stay up overnight
   const erf = (x) => { const t = 1 / (1 + 0.3275911 * Math.abs(x)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
   const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
   function pctRank(values, v) {
@@ -1187,8 +1194,13 @@
   async function viewGames() {
     const g = await get("games.json");
     const T = await teams();
+    // finals from today stay on the board (with the score) until the day rolls over; they also go to the results list
+    const today = boardDay();
+    const gkey = (x) => `${x.date}|${x.team_a}|${x.team_b}`;
+    const finals = g.recent.filter((x) => gameDay(x) === today).map((x) => ({ ...x, final: true }));
+    const done = new Set(finals.map(gkey));
     const byDate = {};
-    g.upcoming.forEach((x) => (byDate[x.date] = byDate[x.date] || []).push(x));
+    [...g.upcoming.filter((x) => !done.has(gkey(x))), ...finals].forEach((x) => (byDate[gameDay(x)] = byDate[gameDay(x)] || []).push(x));
     const acc = g.season_accuracy;
     // Featured: both teams in the league's top tier (top 25 in college, the top third in the pros).
     const nTeams = Object.keys(T).length;
@@ -1199,14 +1211,24 @@
       const ta = T[x.team_a], tb = T[x.team_b];
       const feat = featured(x);
       const favA = x.p_a >= 0.5;
+      const fin = !!x.final, wonA = fin && x.pts_a > x.pts_b, ok = fin && favA === wonA;
       const edgeT = x.edge > 0 ? x.team_a : x.team_b;
       const site = x.loc === 0 ? `neutral${x.city ? " · " + esc(x.city) : ""}` : `at ${esc(x.loc > 0 ? x.team_a : x.team_b)}`;
-      return `<div class="game${feat ? " featured" : ""}"><div class="g-meta small faint"><span class="ellip">${site}</span>${feat ? `<span class="pill acc" title="Both teams are in the top ${topN} by Power">Top ${topN} matchup</span>` : ""}</div>
-        <div class="g-team ${favA ? "fav" : ""}">${logo(ta)}<a href="#/team/${slugify(x.team_a)}">${esc(x.team_a)}</a><span class="faint small">#${ta ? ta.rank : "–"}</span><b class="num">${fmt(x.pts_a, 0)}</b></div>
-        <div class="g-team ${favA ? "" : "fav"}">${logo(tb)}<a href="#/team/${slugify(x.team_b)}">${esc(x.team_b)}</a><span class="faint small">#${tb ? tb.rank : "–"}</span><b class="num">${fmt(x.pts_b, 0)}</b></div>
-        <div class="prob" role="img" aria-label="${esc(x.team_a)} ${pct(x.p_a)}"><i style="width:${x.p_a * 100}%"></i><i style="width:${(1 - x.p_a) * 100}%"></i></div>
-        <div class="g-foot small"><span><b>${esc(favA ? x.team_a : x.team_b)}</b> ${pct(Math.max(x.p_a, 1 - x.p_a))} · by ${fmt(Math.abs(x.margin))}</span>
-          ${isNum(x.edge) && Math.abs(x.edge) >= 0.75 ? `<span class="pill edge" title="How much this specific matchup moves the game vs the Power gap">edge ${esc(edgeT)} ${fmt(Math.abs(x.edge))}</span>` : ""}
+      const when = timeFmt(x.start);
+      const row = (t, team, isA) => {
+        const won = fin && (isA ? wonA : !wonA);
+        const cls = fin ? (won ? "won" : "lost") : (isA === favA ? "fav" : "");
+        return `<div class="g-team ${cls}">${logo(team)}<a href="#/team/${slugify(t)}">${esc(t)}</a><span class="faint small">${won ? `<span class="win-check" title="Winner">✓</span> ` : ""}#${team ? team.rank : "–"}</span><b class="num">${fin ? (isA ? x.pts_a : x.pts_b) : fmt(isA ? x.pts_a : x.pts_b, 0)}</b></div>`;
+      };
+      const pill = fin ? `<span class="pill final-pill">Final</span>` : feat ? `<span class="pill acc" title="Both teams are in the top ${topN} by Power">Top ${topN} matchup</span>` : "";
+      const foot = fin
+        ? `<span>Pre-game: <b>${esc(favA ? x.team_a : x.team_b)}</b> ${pct(Math.max(x.p_a, 1 - x.p_a))} · <span class="${ok ? "pos" : "neg"}">${ok ? "✓ called it" : "✗ missed"}</span></span>`
+        : `<span><b>${esc(favA ? x.team_a : x.team_b)}</b> ${pct(Math.max(x.p_a, 1 - x.p_a))} · by ${fmt(Math.abs(x.margin))}</span>
+          ${isNum(x.edge) && Math.abs(x.edge) >= 0.75 ? `<span class="pill edge" title="How much this specific matchup moves the game vs the Power gap">edge ${esc(edgeT)} ${fmt(Math.abs(x.edge))}</span>` : ""}`;
+      return `<div class="game${feat ? " featured" : ""}${fin ? " final" : ""}"><div class="g-meta small faint"><span class="ellip">${when ? `<span class="g-time">${esc(when)}</span> · ` : ""}${site}</span>${pill}</div>
+        ${row(x.team_a, ta, true)}${row(x.team_b, tb, false)}
+        <div class="prob" role="img" aria-label="${fin ? "Pre-game: " : ""}${esc(x.team_a)} ${pct(x.p_a)}"><i style="width:${x.p_a * 100}%"></i><i style="width:${(1 - x.p_a) * 100}%"></i></div>
+        <div class="g-foot small">${foot}
           <a href="#/matchup?a=${encodeURIComponent(x.team_a)}&b=${encodeURIComponent(x.team_b)}&site=${x.loc > 0 ? "a" : x.loc < 0 ? "b" : "neutral"}&type=reg">Lab →</a></div></div>`;
     };
     const recent = g.recent.slice(-200).reverse();
@@ -1216,6 +1238,7 @@
         <span class="sc num">${x.pts_a}-${x.pts_b}</span><span class="ellip r ${wonA ? "faint" : ""}">${!wonA ? "<b>" : ""}${x.loc === 0 ? "" : x.loc < 0 ? "@ " : "vs "}${esc(x.team_b)}${!wonA ? "</b>" : ""}</span>
         <span class="r pre small ${ok ? "pos" : "neg"}">${ok ? "✓" : "✗"} pre ${pct(Math.max(x.p_a, 1 - x.p_a))}</span></div>`;
     };
+    const tzName = (inTZ(new Date(), { timeZoneName: "short" }).split(" ").pop() || "").replace(/[^A-Za-z0-9+\-:]/g, "");
     app.innerHTML = `
       <div class="page-head"><div><h1>Games</h1><p class="sub">Forecasts for the next week of ${LG} games, and how this season's pre-game forecasts have done. The current season is never used to train the model, so these numbers are out-of-sample.</p></div>${art("arc")}</div>
       ${acc ? `<div class="tiles">
@@ -1223,17 +1246,18 @@
         <div class="tile"><span class="k">Winners called</span><span class="v num">${pct(acc.accuracy, 1)}</span></div>
         <div class="tile"><span class="k">Avg margin error</span><span class="v num">${fmt(acc.mae)}</span><span class="r">points</span></div>
         <div class="tile"><span class="k">Log loss</span><span class="v num">${fmt(acc.log_loss, 3)}</span>${isNum(acc.market_log_loss) ? `<span class="r">betting line ${fmt(acc.market_log_loss, 3)} on ${acc.market_n} games (model ${fmt(acc.model_log_loss_on_market_games, 3)})</span>` : ""}</div></div>` : ""}
-      <div class="section-head" style="margin-top:20px"><h2 style="margin:0">Upcoming</h2><input type="search" id="gq" placeholder="Filter by team…" aria-label="Filter by team"></div>
+      <div class="section-head" style="margin-top:20px"><h2 style="margin:0">Schedule</h2><input type="search" id="gq" placeholder="Filter by team…" aria-label="Filter by team"></div>
+      <p class="note" style="margin-top:-4px">Tip-off times are in your time zone${tzName ? ` (${esc(tzName)})` : ""}. Today's finals stay here with the score until the day is over.</p>
       <div id="up"></div>
       <h2 class="day" style="margin-top:28px">Recent results</h2>
       <div class="card flush">${recent.map(resRow).join("") || `<p class="faint" style="padding:16px">No games yet.</p>`}</div>`;
     const draw = () => {
       const q = ($("#gq").value || "").toLowerCase();
-      $("#up").innerHTML = Object.entries(byDate).map(([d, xs]) => {
+      $("#up").innerHTML = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([d, xs]) => {
         const ys = xs.filter((x) => !q || x.team_a.toLowerCase().includes(q) || x.team_b.toLowerCase().includes(q))
           .sort((a, b) => (featured(b) - featured(a)) || (rk(a.team_a) + rk(a.team_b) - rk(b.team_a) - rk(b.team_b)));
-        const nf = ys.filter(featured).length;
-        return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games${nf ? ` · ${nf} featured` : ""}</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
+        const nf = ys.filter(featured).length, nd = ys.filter((x) => x.final).length;
+        return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games${nd ? ` · ${nd} final` : ""}${nf ? ` · ${nf} featured` : ""}</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
       }).join("") || `<p class="faint">No ${LG} games scheduled in the next week${q ? " for that filter" : ""}.</p>`;
     };
     $("#gq").addEventListener("input", draw);
