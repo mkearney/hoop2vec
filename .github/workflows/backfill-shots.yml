@@ -33,8 +33,8 @@ jobs:
       LEAGUE: ${{ inputs.league }}
       SEASONS: ${{ inputs.seasons }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -45,7 +45,7 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Restore data cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: data/${{ inputs.league }}
           key: hoop2vec-data-${{ inputs.league }}-${{ github.run_id }}
@@ -54,7 +54,7 @@ jobs:
         run: python -m hoop2vec shots "$SEASONS" "--$LEAGUE"
       - name: Save data cache (even if a later step fails)
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/${{ inputs.league }}
           key: hoop2vec-data-${{ inputs.league }}-${{ github.run_id }}

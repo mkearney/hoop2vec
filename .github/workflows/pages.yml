@@ -29,34 +29,34 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main             # the newest commit, including what the calling workflow just pushed
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - name: Install Pillow (share images)
         run: pip install "$(grep -i '^pillow' requirements.txt)"
       - name: Restore live data (mens)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/mens
           key: hoop2vec-live-mens-${{ github.run_id }}
           restore-keys: hoop2vec-live-mens-
       - name: Restore live data (womens)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/womens
           key: hoop2vec-live-womens-${{ github.run_id }}
           restore-keys: hoop2vec-live-womens-
       - name: Restore live data (nba)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/nba
           key: hoop2vec-live-nba-${{ github.run_id }}
           restore-keys: hoop2vec-live-nba-
       - name: Restore live data (wnba)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/wnba
           key: hoop2vec-live-wnba-${{ github.run_id }}
@@ -65,9 +65,9 @@ jobs:
         run: python -m hoop2vec.live overlay
       - name: Page shells, share images and crawl files for the data being deployed
         run: python -m hoop2vec site
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

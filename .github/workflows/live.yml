@@ -24,29 +24,29 @@ jobs:
     outputs:
       leagues: ${{ steps.check.outputs.leagues }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           sparse-checkout: hoop2vec
       - name: Restore live state (mens)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/mens
           key: hoop2vec-live-mens-${{ github.run_id }}
           restore-keys: hoop2vec-live-mens-
       - name: Restore live state (womens)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/womens
           key: hoop2vec-live-womens-${{ github.run_id }}
           restore-keys: hoop2vec-live-womens-
       - name: Restore live state (nba)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/nba
           key: hoop2vec-live-nba-${{ github.run_id }}
           restore-keys: hoop2vec-live-nba-
       - name: Restore live state (wnba)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/wnba
           key: hoop2vec-live-wnba-${{ github.run_id }}
@@ -73,9 +73,9 @@ jobs:
       HOOP2VEC_LEAGUE: ${{ matrix.league }}
       HOOP2VEC_LIVE_FORCE: ${{ inputs.force && '1' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore live state
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: live/${{ matrix.league }}
           key: hoop2vec-live-${{ matrix.league }}-${{ github.run_id }}
@@ -86,7 +86,7 @@ jobs:
           out=$(python3 -m hoop2vec.live check-one | tail -n1)
           echo "$out"
           [[ "$out" == new* ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: steps.need.outputs.run == 'true'
         with:
           python-version: "3.13"
@@ -98,7 +98,7 @@ jobs:
           pip install -r requirements.txt
       - name: Restore data cache
         if: steps.need.outputs.run == 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: data/${{ matrix.league }}
           key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
@@ -109,13 +109,13 @@ jobs:
         run: python -m hoop2vec live "--${{ matrix.league }}"
       - name: Save data cache
         if: steps.live.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/${{ matrix.league }}
           key: hoop2vec-data-${{ matrix.league }}-${{ github.run_id }}
       - name: Save live state
         if: steps.live.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: live/${{ matrix.league }}
           key: hoop2vec-live-${{ matrix.league }}-${{ github.run_id }}
