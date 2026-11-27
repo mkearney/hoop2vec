@@ -1207,6 +1207,7 @@
     const topN = nTeams > 100 ? 25 : Math.round(nTeams / 3);
     const rk = (n) => (T[n] || {}).rank || 999;
     const featured = (x) => rk(x.team_a) <= topN && rk(x.team_b) <= topN;
+    const tip = (x) => { const t = x.start ? Date.parse(x.start) : NaN; return isNaN(t) ? Infinity : t; };  // earliest first; TBD last
     const card = (x) => {
       const ta = T[x.team_a], tb = T[x.team_b];
       const feat = featured(x);
@@ -1255,7 +1256,7 @@
       const q = ($("#gq").value || "").toLowerCase();
       $("#up").innerHTML = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([d, xs]) => {
         const ys = xs.filter((x) => !q || x.team_a.toLowerCase().includes(q) || x.team_b.toLowerCase().includes(q))
-          .sort((a, b) => (featured(b) - featured(a)) || (rk(a.team_a) + rk(a.team_b) - rk(b.team_a) - rk(b.team_b)));
+          .sort((a, b) => (tip(a) - tip(b)) || (featured(b) - featured(a)) || (rk(a.team_a) + rk(a.team_b) - rk(b.team_a) - rk(b.team_b)));
         const nf = ys.filter(featured).length, nd = ys.filter((x) => x.final).length;
         return ys.length ? `<h2 class="day">${new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} <span class="faint small">${ys.length} games${nd ? ` · ${nd} final` : ""}${nf ? ` · ${nf} featured` : ""}</span></h2><div class="games">${ys.map(card).join("")}</div>` : "";
       }).join("") || `<p class="faint">No ${LG} games scheduled in the next week${q ? " for that filter" : ""}.</p>`;
