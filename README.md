@@ -183,18 +183,23 @@ Women's season-ahead backtest, 2022–2026 (trained on 2020 onward; log loss):
 
 | Model | All games (26,762) | NCAA tournament (332) | Sportsbook lines, 2025-26 (811) |
 |---|---|---|---|
-| **hoop2vec blend** (80% network + 20% linear, live model) | **0.4614** | 0.3932 | 0.3896 |
-| Matchup network (all features) | 0.4616 | 0.3956 | **0.3894** |
-| Linear game model | 0.4653 | 0.3934 | 0.3933 |
-| Adjusted efficiency (AdjEM) | 0.4704 | 0.4050 | 0.3932 |
-| Dynamic (Kalman) rating | 0.4706 | **0.3924** | 0.3948 |
+| **hoop2vec blend** (50% network + 50% linear, live model) | **0.4596** | **0.3947** | **0.3893** |
+| Matchup network (all features) | 0.4611 | 0.3969 | 0.3894 |
+| Linear game model | 0.4614 | 0.3960 | 0.3916 |
+| Adjusted efficiency (AdjEM) | 0.4704 | 0.4050 | 0.3930 |
+| Dynamic (Kalman) rating | 0.4624 | 0.3976 | 0.3910 |
 | Elo | 0.4928 | 0.4476 | 0.4169 |
 | Sportsbook line (benchmark only) | – | – | 0.3956 |
 
-The blend beats the linear model on all games by 0.0039 (95% CI 0.0031–0.0047). It also edges the few women's
+The blend beats the linear model on all games by 0.0018 (95% CI 0.0011–0.0025). It also edges the few women's
 sportsbook lines ESPN carries. Women's markets are thinner, so that is plausible. As a sanity check, a one-term
-model on the roster rating alone scores 0.404 on those games, worse than the line (0.396), and the Kalman rating
-alone is level with it.
+model on the roster rating alone scores 0.404 on those games, worse than the line (0.396).
+
+The November 2026 changes helped the women's model more than any other league's: blend 0.4614 to 0.4596, linear
+model 0.4653 to 0.4614, and dynamic rating 0.4706 to 0.4624. The women's rating had been running on settings tuned
+for the men's game. Re-tuned on women's seasons, with each season starting from the roster prior and part of each
+opponent's 3-point luck ignored, it now edges the sportsbook line by itself (0.391), and the linear model is good
+enough that the blend splits evenly between it and the network.
 
 ## NBA and WNBA
 
@@ -224,28 +229,32 @@ works differently:
 | Series, log loss | NBA (224 series, 2012–2026) | WNBA (97 series, 2012–2025) |
 |---|---|---|
 | Home-court team wins at its historical rate | 0.598 | 0.591 |
-| hoop2vec blend | **0.566** | 0.560 |
-| Linear game model | 0.573 | 0.568 |
-| Adjusted efficiency | 0.578 | **0.555** |
+| hoop2vec blend | **0.556** | 0.563 |
+| Linear game model | 0.562 | 0.568 |
+| Adjusted efficiency | 0.562 | **0.553** |
 | Elo | 0.581 | 0.557 |
 
 **Game model.** Season-ahead backtest, log loss:
 
 | | NBA, all games (19,186) | NBA playoffs (1,258) | NBA, DraftKings lines (1,071) | WNBA, all games (3,203) | WNBA playoffs (260) |
 |---|---|---|---|---|---|
-| **hoop2vec blend** | **0.6096** | 0.6347 | 0.5979 | 0.6133 | 0.6251 |
-| Matchup network | 0.6101 | 0.6382 | 0.5981 | 0.6187 | 0.6258 |
-| Linear game model | 0.6136 | **0.6343** | 0.6020 | 0.6132 | 0.6245 |
-| Adjusted efficiency | 0.6147 | 0.6348 | 0.6033 | **0.6126** | 0.6225 |
-| Elo | 0.6174 | 0.6444 | 0.6082 | 0.6190 | **0.6217** |
+| **hoop2vec blend** | **0.6092** | 0.6338 | 0.5965 | 0.6141 | 0.6250 |
+| Matchup network | 0.6093 | 0.6359 | **0.5964** | 0.6190 | 0.6256 |
+| Linear game model | 0.6136 | 0.6333 | 0.6019 | **0.6130** | 0.6231 |
+| Adjusted efficiency | 0.6147 | **0.6332** | 0.6034 | 0.6137 | **0.6203** |
+| Elo | 0.6174 | 0.6444 | 0.6082 | 0.6190 | 0.6217 |
 | Sportsbook line (benchmark) | – | – | **0.5812** | – | – |
 
 Pro games are much closer than college games, so every number sits near 0.6. In the NBA the blend beats the linear
-model by 0.0040 (95% CI 0.0028–0.0052) and the network carries 70% of it; the sportsbook beats everything by about
-0.017, as a sharp market should. With 15 small WNBA seasons the models are within noise of each other and the
-backtest puts 70% on the linear model. Switching player values to RAPM improved NBA games (0.6117 to 0.6096) and
-WNBA games (0.6160 to 0.6133); NBA series got slightly worse (0.558 to 0.566, within noise for 224 series). The Kalman settings were re-tuned on each league (`python -m hoop2vec tune`)
-and kept only if they did better on the three most recent seasons; the college defaults held up in both.
+model by 0.0044 (95% CI 0.0032–0.0057) and the network carries 80% of it; the sportsbook beats everything by about
+0.015, as a sharp market should. With 15 small WNBA seasons the models are within noise of each other and the
+backtest puts 80% on the linear model. Switching player values to RAPM improved NBA games (0.6117 to 0.6096) and
+WNBA games (0.6160 to 0.6133). The November 2026 changes moved NBA games from 0.6096 to 0.6092 and NBA series from
+0.566 to 0.556; the WNBA's linear model improved slightly (0.6132 to 0.6130) while its blend sits at 0.6141, within
+noise of the 0.6133 before. The dynamic rating now starts each season from the roster prior and ignores part of
+each opponent's 3-point luck in both leagues. Its settings were re-tuned with those on (`python -m hoop2vec tune`)
+and kept only if they did better on the three most recent seasons: the WNBA's were kept, while the NBA's tuning
+overfit, so the NBA uses the college defaults plus the two changes.
 
 **Players.** The team-level box plus/minus the women's college site uses has the old PER bias in the pros:
 efficient low-usage centers (Robert Williams III, Mitchell Robinson, Luke Kornet) came out as the NBA's best

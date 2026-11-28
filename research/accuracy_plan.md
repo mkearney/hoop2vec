@@ -253,4 +253,35 @@ seasons have too few teams for the full prior formula; `make_prior` now falls ba
 | Women's, roster prior + 25 percent luck discount | -0.0041 | -0.0012 | +0.0003 | Yes |
 | WNBA, Phase 0 | 0.0000 | +0.0016 | -0.0004 | Yes (as above; 12 teams a season leave early priors thin) |
 | WNBA, Phase 0 but realized availability | | -0.0009 | +0.0004 | No (inconclusive) |
+| Women's, Kalman settings tuned with both on | -0.0074 | -0.0026 | -0.0017 | Yes |
 | WNBA, roster prior + luck, settings tuned | -0.0016 | -0.0007 | -0.0009 | Yes |
+| NBA, Phase 0 | 0.0000 | -0.0004 | +0.0005 | Yes (the network gained 0.0009 on dev seasons) |
+| NBA, roster prior + 25 percent luck discount | -0.0014 | -0.0001 | -0.0001 | Yes |
+| NBA, settings re-tuned with both on | | | | No (worse on the tuner's own held-out seasons) |
+
+Women's and NBA deltas are against Phase 0 for that league; the tuned rows are against the step before.
+
+### What's live
+
+Men's was retrained and re-backtested with everything kept above (commit "Retrain + backtest (mens) with the new
+dynamic rating"). The production backtest: blend 0.5170 on all 81,758 games (was 0.5176), accuracy 73.49 percent
+(was 73.47), DraftKings gap 0.0032 on 5,499 games (was 0.0050), and 0.5212 vs T-Rank's 0.5275 on 65,392 games,
+better in all 12 seasons. The other three leagues were retrained and re-backtested the same day:
+
+| League | Blend before | Blend now | Linear before | Linear now | Kalman before | Kalman now | Network weight |
+|---|---|---|---|---|---|---|---|
+| Men's (81,758 games) | 0.5176 | 0.5170 | 0.5217 | 0.5194 | 0.5259 | 0.5204 | 70% (same) |
+| Women's (26,762) | 0.4614 | 0.4596 | 0.4653 | 0.4614 | 0.4706 | 0.4624 | 50% (was 80%) |
+| NBA (19,186) | 0.6096 | 0.6092 | 0.6136 | 0.6136 | 0.6227 | 0.6218 | 80% (was 70%) |
+| WNBA (3,203) | 0.6133 | 0.6141 | 0.6132 | 0.6130 | 0.6163 | 0.6141 | 20% (was 30%) |
+
+NBA playoff series went from 0.566 to 0.556 (224 series). The WNBA blend is within noise of where it was; most of
+the change there is the honest cost of fitting priors only on earlier seasons in a 12-team league.
+
+### Next
+
+The biggest gains came from the dynamic rating, not the network. The network barely moved, and the two network
+experiments that finished (training toward closing lines, a blend weight by phase) didn't help. Still open from
+Phase 2: network width, epochs, and dropout (a wider-network run and a 24-epoch run were started and stopped for time),
+and the efficiency-rating settings (half-life, weight floor, prior weight). Phase 3's injury archive is running; after
+a season it can be used to fit an availability model on reported status.
