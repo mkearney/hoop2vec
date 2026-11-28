@@ -5,8 +5,8 @@
 ## Leagues
 
 - [Men's](https://hoop2vec.net/mens/): Ratings, players, NBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 28, 2026: 1. Illinois, 2. Houston, 3. Florida, 4. Duke, 5. Connecticut.
-- [Women's](https://hoop2vec.net/womens/): Ratings, players, WNBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 27, 2026: 1. LSU, 2. Michigan, 3. South Carolina, 4. UConn, 5. Texas.
-- [NBA](https://hoop2vec.net/nba/): Ratings, players, forecasts and playoff odds with the play-in. Top 5 on Nov 27, 2026: 1. Spurs, 2. Celtics, 3. Rockets, 4. Thunder, 5. Trail Blazers.
+- [Women's](https://hoop2vec.net/womens/): Ratings, players, WNBA prospects, forecasts and the 2027 bracket. Top 5 on Nov 28, 2026: 1. LSU, 2. Michigan, 3. South Carolina, 4. UConn, 5. Texas.
+- [NBA](https://hoop2vec.net/nba/): Ratings, players, forecasts and playoff odds with the play-in. Top 5 on Nov 28, 2026: 1. Spurs, 2. Celtics, 3. Rockets, 4. Knicks, 5. Trail Blazers.
 - [WNBA](https://hoop2vec.net/wnba/): Ratings, players, forecasts and playoff odds. Top 5 on Nov 27, 2026: 1. Dream, 2. Lynx, 3. Aces, 4. Valkyries, 5. Liberty.
 
 ## Data (static JSON, rebuilt every morning and updated as games finish)
