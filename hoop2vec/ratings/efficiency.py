@@ -15,14 +15,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ..config import GAME_MINUTES
+from ..config import GAME_MINUTES, LEAGUE
 import scipy.sparse as sp
 from scipy.linalg import cho_factor, cho_solve
 
 STATS = ["eff", "pace", "efg", "tov", "orb", "ftr", "tpar", "tp", "twop", "blk", "stl", "ast"]
 GROUPS = [["eff", "pace"], ["efg", "tov", "orb", "ftr", "tpar", "tp", "twop", "blk", "stl", "ast"]]
 HALF_LIFE_DAYS = 45.0
-WEIGHT_FLOOR = 0.40
+WEIGHT_FLOOR = {"mens": 0.70, "womens": 0.70}.get(LEAGUE, 0.40)  # college 0.7 (backtest 2026-11-28): old games keep more weight
 
 
 def team_game_rows(games: pd.DataFrame) -> pd.DataFrame:

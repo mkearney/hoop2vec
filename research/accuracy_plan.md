@@ -278,10 +278,96 @@ better in all 12 seasons. The other three leagues were retrained and re-backtest
 NBA playoff series went from 0.566 to 0.556 (224 series). The WNBA blend is within noise of where it was; most of
 the change there is the honest cost of fitting priors only on earlier seasons in a 12-team league.
 
-### Next
+## Progress, 2026-11-28 afternoon: the rest of Phases 2 and 3
 
-The biggest gains came from the dynamic rating, not the network. The network barely moved, and the two network
-experiments that finished (training toward closing lines, a blend weight by phase) didn't help. Still open from
-Phase 2: network width, epochs, and dropout (a wider-network run and a 24-epoch run were started and stopped for time),
-and the efficiency-rating settings (half-life, weight floor, prior weight). Phase 3's injury archive is running; after
-a season it can be used to fit an availability model on reported status.
+Same harness, same rules. The baseline is the live configuration from the morning (men's blend 0.5169 dev, 0.5174
+holdout). "Rating models" means the run skipped the network to save time and scored the linear, Kalman, and
+efficiency models only.
+
+### Network settings (men's, with the network)
+
+| Change | Network (dev) | Blend (dev) | Blend (holdout) | Kept |
+|---|---|---|---|---|
+| Width 128, embedding 32 (was 64, 24) | +0.0000 | -0.0001 | -0.0000 | No |
+| 24 epochs (was 14) | +0.0003 | -0.0000 | +0.0002 | No |
+| Dropout 0.2 (was 0.1) | +0.0001 | +0.0001 | +0.0002 | No |
+| Weight decay 1e-3 (was 1e-4) | -0.0000 | -0.0000 | +0.0000 | No |
+
+The network sits at a flat optimum for its inputs. Nothing about its size or training moved it.
+
+### Elo (all leagues)
+
+Elo's K, home edge, and carry-over were tuned on its own log loss (fit through the season three back, checked on
+the last three). It improved a lot by itself in every league, and both college leagues prefer no home edge inside
+the rating updates (in college the home team in a mismatch is usually the stronger one). Elo only reaches the
+forecasts as a network input, though.
+
+| League | Elo alone (dev) | Network (dev) | Blend (dev) | Blend (holdout) | Kept |
+|---|---|---|---|---|---|
+| Men's (K 40.6, no home edge, carry 0.77) | -0.0040 | -0.0001 | -0.0000 | -0.0000 | Yes, with the settings below |
+| Women's (K 57, no home edge, carry 0.82) | -0.0100 | -0.0003 | -0.0001 | +0.0001 | Yes, with the settings below |
+| NBA (K 16.4, home edge 53, carry 0.62) | -0.0016 | +0.0000 | +0.0000 | +0.0001 | No |
+| WNBA (K 22.6, home edge 47, carry 0.41) | -0.0006 | +0.0001 | +0.0000 | -0.0000 | No |
+
+### Player priors (Phase 3)
+
+Two refinements, both fit season-ahead (`players.PRIOR_V2`). Recruits: the straight line in recruiting rank
+overrated middling recruits by about 1 BPM and underrated the top 2 percent by 2.5, so it became a curve through
+rank-bin averages. Transfers: with last season's information only, a transfer whose new team was much better than
+his old one beat his prior by 2.6 BPM, against 0.4 for one who moved down, so the prior gained a term in the two
+teams' quality. Together they cut the men's player-prior error from 3.16 to 3.11 (transfers 2.98 to 2.63). Game
+forecasts didn't move: men's +0.00002, women's +0.0004, NBA +0.0001, WNBA +0.0001 on dev seasons. Team ratings
+learn from games within weeks, so a better preseason guess about individual players fades fast. Left off.
+
+### Rating and player settings (men's, rating models)
+
+| Change | Efficiency (dev) | Kalman (dev) | Linear (dev) | Linear (holdout) |
+|---|---|---|---|---|
+| Efficiency half-life 30 / 90 days (was 45) | +0.0001 / -0.0001 | 0 / 0 | 0 / 0 | 0 / 0 |
+| Efficiency weight floor 0.2 / 0.7 (was 0.4) | +0.0004 / -0.0003 | -0.0001 / +0.0001 | 0 / 0 | +0.0001 / 0 |
+| Efficiency prior weight 3 / 9 games (was 5) | +0.0014 / +0.0011 | 0 / 0 | 0 / 0 | 0 / 0 |
+| In-season player prior 150 / 600 minutes (was 300) | 0 / 0 | 0 / 0 | 0 / 0 | 0 / +0.0001 |
+| Last season's value shrunk as if 125 / 500 minutes (was 250) | -0.0002 / +0.0006 | -0.0002 / +0.0005 | -0.0001 / +0.0005 | -0.0004 / +0.0007 |
+| Replacement value 0 / -4 (was -2) | +0.0003 / -0.0002 | 0 / 0 | +0.0004 / -0.0002 | +0.0003 / -0.0002 |
+
+Women's measured availability rates (53, 37, 24, 19, 14, and 4 percent after missing one to six or more games) left
+the women's blend at 0.4596 on all games: +0.0002 on dev seasons, -0.0003 on the holdout.
+
+### Combined, with the network
+
+The settings that helped the rating models, plus tuned Elo for the college leagues, were run together through the
+full backtest: last season's value shrunk as if 125 minutes, replacement value -4, efficiency weight floor 0.7.
+
+| League | Network (dev) | Blend (dev) | Blend (holdout) | Blend, all games | Kept |
+|---|---|---|---|---|---|
+| Men's (with tuned Elo) | -0.0006 | -0.0005 | -0.0008 | 0.5170 to 0.5165 | Yes |
+| Women's (with tuned Elo) | -0.0009 | -0.0007 | +0.0000 | 0.4596 to 0.4592 | Yes |
+| NBA | +0.0008 | +0.0008 | +0.0012 | 0.6097 to 0.6106 | No |
+| WNBA | -0.0001 | -0.0003 | +0.0008 | 0.6140 to 0.6139 | No (dev and holdout disagree) |
+
+This time the network moved, probably because the replacement value feeds its availability input and the prior
+minutes feed its roster inputs. The NBA got worse: its player values come from lineups, which already price a
+missing player, so a steeper replacement value overshoots. Faster in-season trust of box-score values (prior worth
+150 minutes instead of 300) was also tried with the network on men's: +0.0001, not kept. The college leagues now use
+these settings and their tuned Elo; the pros keep theirs. Women's also switched to its measured availability rates,
+which were neutral on their own.
+
+### Where every league ends up
+
+Production retrain and backtest, end of the day, against the backtests committed at the start of the day. Log loss
+moved in every league but the WNBA; accuracy barely moved anywhere, as expected for gains this size:
+
+| League | Blend, start of day | Blend now | Accuracy, start | Accuracy now | Benchmarks now |
+|---|---|---|---|---|---|
+| Men's (81,758 games) | 0.5176 | 0.5165 | 73.47% | 73.53% | DraftKings gap 0.0027 (was 0.0050); T-Rank 0.5275, beaten in all 12 seasons |
+| Women's (26,762) | 0.4614 | 0.4592 | 77.26% | 77.26% | Sportsbook 0.3956 vs blend 0.3890 (811 games) |
+| NBA (19,186) | 0.6096 | 0.6092 | 66.32% | 66.32% | DraftKings 0.5812 vs blend 0.5965; playoff series 0.566 to 0.556 |
+| WNBA (3,203) | 0.6133 | 0.6141 | 66.13% | 65.91% | Within noise; see the morning table |
+
+### Not done, and why
+
+The injury model needs a season of the archived reports that started today, so it waits until spring. College
+player values from lineups (Phase 4) were meant to follow it; the injury data will show how much better player
+values could be worth. Home edge by era and altitude were skipped: the only era effect in the backtest is 2021,
+one season of empty arenas, worth about 0.0001 overall by a rough calculation, and altitude needs elevation data the pipeline
+doesn't have.

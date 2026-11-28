@@ -42,7 +42,7 @@ from scratch every morning.
 A checkmark doesn't mean equal quality. KenPom and Torvik have years of trust that hoop2vec hasn't earned. One head
 to head exists: barttorvik.com keeps T-Rank's own pre-game win probability for every game since 2015, written before
 tip-off and never changed afterward, and on those 65,392 games the hoop2vec backtest scores better in every season
-(log loss 0.5212 vs 0.5275). KenPom's predictions aren't free to check. EvanMiya's college player ratings and Dunks &
+(log loss 0.5207 vs 0.5275). KenPom's predictions aren't free to check. EvanMiya's college player ratings and Dunks &
 Threes' NBA ones are more sophisticated than hoop2vec's. A sharp sportsbook still beats hoop2vec during the regular
 season.
 
@@ -119,32 +119,37 @@ game from features as of the day before, with availability knowable before tip-o
 
 | Model | All games (81,758) | NCAA tournament (936) | Sportsbook lines, 2025-26 (5,499) | T-Rank games, 2015–2026 (65,392) |
 |---|---|---|---|---|
-| **hoop2vec blend** (70% network + 30% linear, live model) | **0.5170** | 0.5461 | 0.5454 | **0.5212** |
-| Matchup network (all features) | 0.5175 | 0.5481 | 0.5457 | 0.5216 |
-| Matchup network (core features) | 0.5178 | 0.5489 | 0.5457 | 0.5219 |
-| Linear game model | 0.5194 | 0.5449 | 0.5479 | 0.5238 |
-| Dynamic (Kalman) rating | 0.5204 | 0.5450 | 0.5486 | 0.5245 |
-| Adjusted efficiency (AdjEM) | 0.5246 | **0.5447** | 0.5493 | 0.5293 |
-| Elo | 0.5382 | 0.5660 | 0.5676 | 0.5421 |
+| **hoop2vec blend** (70% network + 30% linear, live model) | **0.5165** | 0.5466 | 0.5449 | **0.5207** |
+| Matchup network (all features) | 0.5169 | 0.5487 | 0.5452 | 0.5211 |
+| Matchup network (core features) | 0.5171 | 0.5489 | 0.5450 | 0.5213 |
+| Linear game model | 0.5190 | 0.5450 | 0.5475 | 0.5235 |
+| Dynamic (Kalman) rating | 0.5203 | 0.5453 | 0.5487 | 0.5244 |
+| Adjusted efficiency (AdjEM) | 0.5240 | **0.5446** | 0.5492 | 0.5287 |
+| Elo | 0.5338 | 0.5588 | 0.5628 | 0.5377 |
 | DraftKings line (benchmark only) | – | – | **0.5422** | – |
 | T-Rank pre-game probability (benchmark only) | – | – | – | 0.5275 |
 
-The blend beats the linear model on all games by 0.0024 log loss (95% CI 0.0020–0.0029) and was chosen on that.
+The blend beats the linear model on all games by 0.0026 log loss (95% CI 0.0021–0.0031) and was chosen on that.
 In each season of the table, its weight comes only from earlier seasons. It picks the winner 73.5% of the time. On the
 936 tournament games every reasonable model is within noise of the others, and play-by-play style factors add
 nothing measurable. T-Rank's stored pre-game probabilities lose to the blend in all 12 seasons they cover, by
-0.003 to 0.010. A real sportsbook is still better than the model during the regular season and level with it in
+0.004 to 0.010. A real sportsbook is still better than the model during the regular season and level with it in
 March, as you'd expect from an honest public-data model. ESPN's older "consensus" lines (2015–2023) are soft,
-especially in November: the blend beats them on 41,280 games (0.5253 vs 0.5330), so they are not used as
+especially in November: the blend beats them on 41,280 games (0.5250 vs 0.5330), so they are not used as
 evidence of skill.
 
 The November 2026 changes (`research/accuracy_plan.md`, every experiment logged in `research/experiments.jsonl`)
-moved the blend from 0.5176 to 0.5170 and cut the DraftKings gap from 0.0050 to 0.0032. Most of it came from the
-dynamic rating, which went from 0.5259 to 0.5204. It now starts each season from the roster-based preseason prior
-instead of the league average, ignores a third of each opponent's 3-point luck, and was re-tuned with both in place.
-The backtest also got stricter: every fitted piece (preseason prior coefficients, class progression, the recruiting
-slope) now uses only seasons before the one it predicts, and both game models train on the same pre-game
-availability estimate they are tested on.
+moved the blend from 0.5176 to 0.5165, accuracy from 73.47% to 73.53%, and cut the DraftKings gap from 0.0050 to
+0.0027. Most of it came from the dynamic rating, which went from 0.5259 to 0.5203. It now starts each season from the
+roster-based preseason prior instead of the league average, ignores a third of each opponent's 3-point luck, and was
+re-tuned with both in place. Smaller pieces: returning players' values are shrunk less toward replacement (as if 125
+extra minutes, not 250), a missing player now costs more (replacement value -4, not -2), the efficiency ratings keep
+more weight on early-season games, and Elo was re-tuned (it now ignores home court in its updates, since a home team
+in a college mismatch is usually the stronger one). The backtest also got stricter: every fitted piece (preseason
+prior coefficients, class progression, the recruiting slope) now uses only seasons before the one it predicts, and
+both game models train on the same pre-game availability estimate they are tested on. A wider network, longer
+training, more dropout, closing lines as a training target, and sharper player priors for recruits and transfers
+were all tried and left out because they didn't help.
 
 ## Women's basketball
 
@@ -183,23 +188,25 @@ Women's season-ahead backtest, 2022–2026 (trained on 2020 onward; log loss):
 
 | Model | All games (26,762) | NCAA tournament (332) | Sportsbook lines, 2025-26 (811) |
 |---|---|---|---|
-| **hoop2vec blend** (50% network + 50% linear, live model) | **0.4596** | **0.3947** | **0.3893** |
-| Matchup network (all features) | 0.4611 | 0.3969 | 0.3894 |
-| Linear game model | 0.4614 | 0.3960 | 0.3916 |
-| Adjusted efficiency (AdjEM) | 0.4704 | 0.4050 | 0.3930 |
-| Dynamic (Kalman) rating | 0.4624 | 0.3976 | 0.3910 |
-| Elo | 0.4928 | 0.4476 | 0.4169 |
+| **hoop2vec blend** (50% network + 50% linear, live model) | **0.4592** | **0.3950** | **0.3890** |
+| Matchup network (all features) | 0.4606 | 0.3971 | 0.3892 |
+| Linear game model | 0.4612 | 0.3955 | 0.3911 |
+| Adjusted efficiency (AdjEM) | 0.4700 | 0.4015 | 0.3938 |
+| Dynamic (Kalman) rating | 0.4625 | 0.3979 | 0.3909 |
+| Elo | 0.4831 | 0.4322 | 0.4170 |
 | Sportsbook line (benchmark only) | – | – | 0.3956 |
 
-The blend beats the linear model on all games by 0.0018 (95% CI 0.0011–0.0025). It also edges the few women's
+The blend beats the linear model on all games by 0.0020 (95% CI 0.0013–0.0028). It also edges the few women's
 sportsbook lines ESPN carries. Women's markets are thinner, so that is plausible. As a sanity check, a one-term
 model on the roster rating alone scores 0.404 on those games, worse than the line (0.396).
 
-The November 2026 changes helped the women's model more than any other league's: blend 0.4614 to 0.4596, linear
-model 0.4653 to 0.4614, and dynamic rating 0.4706 to 0.4624. The women's rating had been running on settings tuned
+The November 2026 changes helped the women's model more than any other league's: blend 0.4614 to 0.4592, linear
+model 0.4653 to 0.4612, and dynamic rating 0.4706 to 0.4625. The women's rating had been running on settings tuned
 for the men's game. Re-tuned on women's seasons, with each season starting from the roster prior and part of each
 opponent's 3-point luck ignored, it now edges the sportsbook line by itself (0.391), and the linear model is good
-enough that the blend splits evenly between it and the network.
+enough that the blend splits evenly between it and the network. The women's site also shares the men's smaller
+changes (returning players shrunk less, a steeper cost for missing players, more weight on early games in the
+efficiency ratings, re-tuned Elo) and uses availability rates measured on women's games.
 
 ## NBA and WNBA
 

@@ -10,6 +10,24 @@ CARRY = 0.72         # season-to-season retention (rest regresses to conference 
 NEW_TEAM = 1300.0
 
 
+PARAMS_FILE = "elo_params.json"
+
+
+def load_params() -> dict:
+    """The league's Elo settings (artifacts/<league>/elo_params.json: k, hca, carry), else the defaults above, with
+    single settings overridden by HOOP2VEC_ELO_PARAMS (a JSON object; used by research/experiment.py runs)."""
+    import json
+    import os
+
+    from ..config import ARTIFACTS
+    f = ARTIFACTS / PARAMS_FILE
+    d = {"k": K, "hca": HCA, "carry": CARRY}
+    if f.exists():
+        d.update(json.loads(f.read_text()))
+    d.update(json.loads(os.environ.get("HOOP2VEC_ELO_PARAMS") or "{}"))
+    return d
+
+
 def run(games: pd.DataFrame, k: float = K, hca: float = HCA, carry: float = CARRY):
     """Return (pregame elo per game [elo_a, elo_b], final ratings dict, history DataFrame)."""
     g = games[(games["type"] != "nond1")].sort_values(["date", "gid"]).reset_index()

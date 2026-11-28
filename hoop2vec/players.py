@@ -11,16 +11,28 @@ import pandas as pd
 
 from . import espn_fallback as espn_season
 from . import history
-from .config import GAME_MINUTES, PROC, current_season
+from .config import GAME_MINUTES, LEAGUE, PROC, current_season
 from .sources import torvik
 
 K_MIN = 300.0          # prior strength in minutes for in-season player values
 K_NEW = K_MIN          # tested 75 (faster box-score trust for unmatched newcomers): worse agreement
 NEW_PRIOR = -3.0       # prior value for unmatched ESPN-fallback newcomers
 SYNTH_PID = 90_000_000 # ids >= this are ESPN athletes not matched to a Torvik player
-V_REPL = -2.0          # value of the minutes a missing player hands to the bench
+# value of the minutes a missing player hands to the bench; -4 in college (backtest 2026-11-28: missing players cost
+# more than -2 implied; -6 was no better). The pros keep -2: lineup-based values already price them, and -4 hurt.
+V_REPL = {"mens": -4.0, "womens": -4.0}.get(LEAGUE, -2.0)
 PART_DECAY = 0.95      # per-game recency decay for participation (mirrors rating recency)
 CLS_NUM = {"Fr": 1, "So": 2, "Jr": 3, "Sr": 4}
+# last season's value is shrunk toward replacement as if it were this many extra minutes; 125 in college (backtest
+# 2026-11-28: 250 shrank returning players too hard; 60 was no better)
+PRIOR_MINUTES = {"mens": 125.0, "womens": 125.0}.get(LEAGUE, 250.0)
+# Player-prior refinements (research/accuracy_plan.md, Phase 3): a recruiting curve from bin averages instead of a
+# straight line in rank, and a transfer term from last season's quality of the old and new teams. Both are fit
+# season-ahead like the rest of the priors. Off: they cut the men's player-prior error (RMSE 3.16 to 3.11, transfers
+# 2.98 to 2.63), but game forecasts didn't improve in any league (men's +0.00002, women's +0.0004, NBA +0.0001,
+# WNBA +0.0001 on dev seasons), since team ratings learn from games within weeks.
+PRIOR_V2 = False
+REC_BINS = [0, 50, 70, 80, 90, 95, 98, 100.01]
 
 
 def cls_num(s: pd.Series) -> pd.Series:
@@ -121,6 +133,17 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
     first = ps[is_first & (ps["mins"] > 150) & ps["rec_rank"].notna()]
     from .config import PRO_LEAGUE
     new = ps[is_first & (ps["season"] > ps["season"].min()) & (ps["mins"] > 150) & ps["bpm"].notna()]
+    # team quality last season (minute-weighted player value x 5), known before this season; transfers' outcomes
+    q = ps.dropna(subset=["bpm", "mins"]) if PRIOR_V2 else ps.iloc[:0]
+    q = q[q["mins"] >= 40]
+    tmin = q["mins"].groupby([q["season"] + 1, q["team"]]).sum()
+    tq = ((q["bpm"] * q["mins"]).groupby([q["season"] + 1, q["team"]]).sum() / tmin * 5)
+    tq = tq[tmin >= 2000].clip(-40, 40)  # a real season's worth of minutes; no extreme small-sample teams
+    trf = ps[["season", "pid", "team", "bpm", "mins"]].merge(prev, on=["season", "pid"])
+    trf = trf[(trf["mins"] > 200) & (trf["p_mins"] > 200) & (trf["team"] != trf["prev_team"])].copy()
+    trf["tq_dest"] = tq.reindex(pd.MultiIndex.from_arrays([trf["season"], trf["team"]])).to_numpy()
+    trf["tq_orig"] = tq.reindex(pd.MultiIndex.from_arrays([trf["season"], trf["prev_team"]])).to_numpy()
+    trf = trf.dropna(subset=["tq_dest", "tq_orig", "bpm", "p_bpm"])
 
     def fit(upto):
         """(class progression, recruiting slope and intercept, newcomer level) from seasons before ``upto``,
@@ -133,23 +156,54 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
         if PRO_LEAGUE:  # no recruiting ranks: newcomers start at the minute-weighted mean of past first-season players
             n = new[new["season"] < upto]
             base = float(np.average(n["bpm"], weights=n["mins"])) if len(n) > 50 else None
-        return prog, rec, base
+        curve = tcoef = None
+        if PRIOR_V2:
+            if len(f) > 300:  # recruiting curve: weighted mean rank and value in each rank bin, interpolated
+                wf = np.sqrt(f["mins"])
+                gb = pd.cut(f["rec_rank"], REC_BINS, include_lowest=True)
+                xc = (f["rec_rank"] * wf).groupby(gb, observed=True).sum() / wf.groupby(gb, observed=True).sum()
+                yc = (f["bpm"] * wf).groupby(gb, observed=True).sum() / wf.groupby(gb, observed=True).sum()
+                curve = (xc.to_numpy(float), yc.to_numpy(float))
+            t = trf[trf["season"] < upto]
+            if len(t) > 200 and prog is not None:  # transfers: what the usual prior misses, by old and new team
+                sh = t["p_mins"] / (t["p_mins"] + PRIOR_MINUTES)
+                res = t["bpm"] - (sh * t["p_bpm"] + (1 - sh) * -3.0) - t["p_cls"].map(prog).fillna(0.0)
+                X = np.c_[t["tq_dest"], t["tq_orig"], np.ones(len(t))]
+                tcoef = tuple(np.linalg.lstsq(X, res.to_numpy(float), rcond=None)[0])
+        return prog, rec, base, curve, tcoef
 
     cur = current_season()
     seasons = sorted(r["season"].unique())
     fits = {s: fit(min(s, cur)) for s in seasons}
     # the first seasons (training data only) borrow the earliest fit that has enough data; failing that, defaults
-    default = ({}, (0.08, -6.0), -4.5)
-    earliest = [next((fits[s][k] for s in seasons if fits[s][k] is not None), default[k]) for k in range(3)]
+    default = ({}, (0.08, -6.0), -4.5, None, None)
+    earliest = [next((fits[s][k] for s in seasons if fits[s][k] is not None), default[k]) for k in range(5)]
     fits = {s: tuple(v if v is not None else earliest[k] for k, v in enumerate(fs)) for s, fs in fits.items()}
     b1 = r["season"].map({s: f[1][0] for s, f in fits.items()}).to_numpy(float)
     b0 = r["season"].map({s: f[1][1] for s, f in fits.items()}).to_numpy(float)
     newcomer_base = r["season"].map({s: f[2] for s, f in fits.items()}).to_numpy(float)
 
-    shrink = r["p_mins"].fillna(0) / (r["p_mins"].fillna(0) + 250.0)
+    shrink = r["p_mins"].fillna(0) / (r["p_mins"].fillna(0) + PRIOR_MINUTES)
     bump = pd.Series([fits[s][0].get(c, 0.0) if pd.notna(c) else 0.0 for s, c in zip(r["season"], r["p_cls"])],
                      index=r.index, dtype=float)
-    fresh = np.where(r["rec_rank"].notna(), b0 + b1 * r["rec_rank"].fillna(0), newcomer_base)
+    rec_v = b0 + b1 * r["rec_rank"].fillna(0).to_numpy(float)
+    adj = np.zeros(len(r))
+    if PRIOR_V2:
+        rk = r["rec_rank"].fillna(0).to_numpy(float)
+        ss = r["season"].to_numpy()
+        for s, fs in fits.items():
+            m = ss == s
+            if fs[3] is not None:
+                rec_v[m] = np.interp(rk[m], fs[3][0], fs[3][1])
+            if fs[4] is not None:
+                td = tq.reindex(pd.MultiIndex.from_arrays([r.loc[m, "season"], r.loc[m, "team"]])).to_numpy(float)
+                to = tq.reindex(pd.MultiIndex.from_arrays([r.loc[m, "season"], r.loc[m, "prev_team"]])).to_numpy(float)
+                moved = (r.loc[m, "prev_team"].notna() & (r.loc[m, "prev_team"] != r.loc[m, "team"])
+                         & r.loc[m, "p_bpm"].notna()).to_numpy() & np.isfinite(td) & np.isfinite(to)
+                bd, bo, a = fs[4]  # lstsq order: destination, origin, intercept
+                trust = np.clip(r.loc[m, "p_mins"].fillna(0).to_numpy(float) / 200.0, 0, 1)  # fit on 200+ minutes
+                adj[m] = np.where(moved, trust * (a + bd * np.nan_to_num(td) + bo * np.nan_to_num(to)), 0.0)
+    fresh = np.where(r["rec_rank"].notna(), rec_v, newcomer_base)
     base = np.where(r["p_bpm"].notna(), shrink * r["p_bpm"].fillna(0) + (1 - shrink) * (-3.0), fresh)
     r["prior_v"] = base + bump
     # split offense/defense in proportion to last season's split (or 60/40 default)
@@ -157,6 +211,10 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
     r["prior_o"] = np.where(o_share, r["prior_v"] - (shrink * r["p_dbpm"].fillna(0) + (1 - shrink) * -1.0),
                             0.6 * r["prior_v"])
     r["prior_d"] = r["prior_v"] - r["prior_o"]
+    # the transfer term goes 60/40 to offense and defense
+    r["prior_v"] += adj
+    r["prior_o"] += 0.6 * adj
+    r["prior_d"] += 0.4 * adj
     r["returning"] = (r["prev_team"] == r["team"]).fillna(False).astype(bool)
     r["experience"] = cls_num(r["cls"])
     return r[["season", "pid", "team", "prior_v", "prior_o", "prior_d", "returning", "experience",
@@ -427,10 +485,11 @@ def deleak_bpm(pg: pd.DataFrame, games: pd.DataFrame, kpre: pd.DataFrame, conf: 
 # P(plays the next game) for a regular who missed the last 1, 2, 3, ... games; the last entry covers longer
 # absences too. Men's college, measured on 2009-2026 regulars (10+ minutes a game): 52% after missing one game, 35%
 # after two, then 24 / 18 / 13% after three to five and 5% after six or more (the old guess was 65 / 30 / 5% for
-# 1 / 2 / 3+). Pros rest a lot (back-to-backs, the end of the season), measured on 2008-2026 regulars: NBA 55% / 36%
-# / 12%, WNBA 49% / 34% / 12%. In the first postseason game, players who sat the last regular-season games almost
-# always return: NBA 91% / 84% / 76%, WNBA 85% / 76% / 63%.
-AVAIL_AFTER_MISSES = {"mens": (0.52, 0.35, 0.24, 0.18, 0.13, 0.05), "womens": (0.65, 0.3, 0.05),
+# 1 / 2 / 3+). Women's college, measured the same way on 2020-2026: 53 / 37 / 24 / 19 / 14 / 4%. Pros rest a lot
+# (back-to-backs, the end of the season), measured on 2008-2026 regulars: NBA 55% / 36% / 12%, WNBA 49% / 34% / 12%.
+# In the first postseason game, players who sat the last regular-season games almost always return: NBA 91% / 84% /
+# 76%, WNBA 85% / 76% / 63%.
+AVAIL_AFTER_MISSES = {"mens": (0.52, 0.35, 0.24, 0.18, 0.13, 0.05), "womens": (0.53, 0.37, 0.24, 0.19, 0.14, 0.04),
                       "nba": (0.55, 0.36, 0.12), "wnba": (0.49, 0.34, 0.12)}
 AVAIL_FIRST_POST = {"nba": (0.91, 0.84, 0.76), "wnba": (0.85, 0.76, 0.63)}
 

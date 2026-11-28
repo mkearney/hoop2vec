@@ -16,6 +16,11 @@ is worth keeping when its dev interval excludes zero and the holdout doesn't dis
 --param prior_w=1 --param luck3_d=0.25. --set overrides a module constant for this run, e.g.
 --set ratings.efficiency.HALF_LIFE_DAYS=60 or --set players.K_MIN=200 (module path under hoop2vec).
 --train-realized trains on realized availability (the old behaviour). --nets 0 skips the matchup network (fast).
+Elo settings for a run come from the environment: HOOP2VEC_ELO_PARAMS='{"k": 40, "hca": 0, "carry": 0.77}'.
+
+Running several experiments at once on a small machine: set HOOP2VEC_THREADS (torch) and OPENBLAS_NUM_THREADS (the
+rating solves) so the total stays near the core count, and give runs that change player settings their own copy of
+data/<league>, since completed seasons' player features are cached one version at a time.
 """
 from __future__ import annotations
 

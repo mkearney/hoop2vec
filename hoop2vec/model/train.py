@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ import torch
 from ..features import STYLE, TEAM_FEATS
 from .net import CTX, MatchupNet, gaussian_nll
 
-torch.set_num_threads(4)
+torch.set_num_threads(int(os.environ.get("HOOP2VEC_THREADS", "4")))  # experiments run in parallel set 2
 
 CENTER_SEASON = ["eff_o", "eff_d"] + [f"{s}_{side}" for s in STYLE for side in ("o", "d")] + ["adjt"]
 EPOCHS = 14

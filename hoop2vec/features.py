@@ -255,7 +255,7 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
         print("  kalman ratings: second pass from the roster prior", flush=True)
 
     # --- elo
-    elo_g, elo_final = ELO.run(g)
+    elo_g, elo_final = ELO.run(g, **ELO.load_params())
 
     # --- long (team-perspective) rows to attach team features
     def side(prefix, opp):
