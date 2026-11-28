@@ -108,9 +108,9 @@ class Net:
         return self
 
     def predict(self, df):
-        sm = TR.season_means(df)
-        smeans = pd.concat([self.smeans, sm[~sm.index.isin(self.smeans.index)]])
-        return TR.predict_df(self.models, self.norm, smeans, df, feats=self.feats)
+        # centre each test game with the league means known on its date, not the whole test season's
+        return TR.predict_df(self.models, self.norm, self.smeans, df, feats=self.feats,
+                             row_means=TR.season_means_asof(df))
 
 
 def add_derived(feat: pd.DataFrame) -> pd.DataFrame:
@@ -129,6 +129,16 @@ def pregame_view(df: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
+# Train on the same pre-game availability the backtest tests on. The realized version (who actually played,
+# garbage-time walk-ons included) puts a little of the outcome into a feature and teaches a coefficient that the
+# noisier pre-game estimate can't support.
+TRAIN_PREGAME = True
+
+
+def training_view(df: pd.DataFrame) -> pd.DataFrame:
+    return pregame_view(df) if TRAIN_PREGAME else df
+
+
 # ------------------------------------------------------------------ driver
 def run(feat: pd.DataFrame, models: dict, seasons, lines: pd.DataFrame | None = None, verbose=True):
     """models: name -> factory() returning an object with fit(df) / predict(df) -> (mu, sigma, p)."""
@@ -136,7 +146,7 @@ def run(feat: pd.DataFrame, models: dict, seasons, lines: pd.DataFrame | None = 
     f = f[f["played"] & f["margin"].notna() & (f["season"] >= FIRST_TRAIN_SEASON)]
     out = []
     for S in seasons:
-        tr = f[f["season"] < S]
+        tr = training_view(f[f["season"] < S])
         te = pregame_view(f[f["season"] == S])
         if te.empty:
             continue
@@ -183,14 +193,25 @@ def market_sigma(y, line) -> float:
     return float(minimize_scalar(ll, bounds=(0.3 * rmse, 2.0 * rmse), method="bounded").x)
 
 
+HOLDOUT_SEASONS = 2  # the most recent backtest seasons, scored separately: decide on "dev", confirm on "holdout"
+TORVIK_CLIP = 0.005  # T-Rank's stored probabilities are rounded to 0.01, so a stored 1.0 means at least 0.995
+
+
 def summarize(P: pd.DataFrame, names, ref=None) -> dict:
     ref = ref or names[0]
     y = P["margin"].to_numpy()
+    seasons = sorted(P["season"].unique())
+    hold = P["season"].isin(seasons[-HOLDOUT_SEASONS:]).to_numpy() if len(seasons) > HOLDOUT_SEASONS else None
     subsets = {
         "all": np.ones(len(P), bool),
         "after_dec1": (P["date"].dt.month <= 4) | (P["date"].dt.month == 12),
         "ncaa": P["is_ncaa"].fillna(False).to_numpy(bool),
     }
+    if hold is not None:
+        subsets["dev"], subsets["holdout"] = ~hold, hold
+    tv = P["torvik_p_a"].notna().to_numpy() if "torvik_p_a" in P else None
+    if tv is not None and tv.any():
+        subsets["torvik_games"] = tv  # games with T-Rank's own pre-game win probability (men's, 2015 on)
     if "line_a" in P:
         has = P["line_a"].notna().to_numpy()
         subsets["line_games"] = has
@@ -208,6 +229,8 @@ def summarize(P: pd.DataFrame, names, ref=None) -> dict:
         if sub.endswith("line_games"):
             lm = P.loc[m, "line_a"].to_numpy()
             r["market"] = metrics(y[m], norm.cdf(lm / market_sigma(y[m], lm)), lm)
+        if sub == "torvik_games":
+            r["torvik"] = metrics(y[m], P.loc[m, "torvik_p_a"].clip(TORVIK_CLIP, 1 - TORVIK_CLIP).to_numpy())
         for k in names:
             if k != ref:
                 d, lo, hi = paired_ci(y[m], P.loc[m, f"p_{k}"].to_numpy(), P.loc[m, f"p_{ref}"].to_numpy())

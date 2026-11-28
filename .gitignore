@@ -7,3 +7,6 @@ __pycache__/
 artifacts/*/style/train_table.parquet
 artifacts/*/backtest_games.parquet
 /live/
+
+# experiment predictions (research/experiment.py)
+research/results/

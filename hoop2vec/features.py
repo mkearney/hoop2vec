@@ -140,6 +140,20 @@ def _enough(sub):
     return len(sub) > 200
 
 
+def season_ahead_coefs(final: dict, roster0: pd.DataFrame, seasons) -> dict:
+    """Prior coefficients for each season, fit only on seasons before it (and never on the current season, which
+    has no final ratings yet), so a backtest season's prior never learns from that season or later ones. The first
+    seasons, before any pair of completed seasons exists, borrow the earliest honest fit (they are training data
+    only, never a backtest season)."""
+    cur = current_season()
+    out = {}
+    for s in seasons:
+        past = {t: f for t, f in final.items() if t < min(s, cur)}
+        out[s] = fit_priors(past, roster0) if any(t - 1 in past for t in past) else None
+    earliest = next((c for c in out.values() if c is not None), {})
+    return {s: (c if c is not None else earliest) for s, c in out.items()}
+
+
 def make_prior(season, final, roster0, coefs, teams):
     prev = final.get(season - 1)
     r0 = roster0[roster0["season"] == season].drop_duplicates("team").set_index("team")
@@ -194,14 +208,15 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
     teams_by = {s: sorted(set(g.loc[g["season"] == s, "team_a"]) | set(g.loc[g["season"] == s, "team_b"]))
                 for s in seasons}
     final0 = _final_ratings(rows_by, teams_by)
-    coefs = fit_priors({s: f for s, f in final0.items() if s < current_season()}, roster0)
+    coefs_by = season_ahead_coefs(final0, roster0, seasons)
+    coefs = coefs_by.get(current_season(), coefs_by[seasons[-1]])
     snaps = []
     snap_keys = {}
     stored = _StoredSnaps()
     priors_used = {}
     for s in seasons:
         teams = teams_by[s]
-        prior = make_prior(s, final0, roster0, coefs, teams)
+        prior = make_prior(s, final0, roster0, coefs_by[s], teams)
         priors_used[s] = prior
         dates = sorted(g.loc[g["season"] == s, "date"].unique())
         if s == current_season():  # no snapshots for future dates (nothing new to learn)
@@ -221,6 +236,15 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
         print(f"  ratings {s}: {len(dates)} snapshots" + (" (unchanged, from the last run)" if reuse else ""), flush=True)
     snaps = pd.concat(snaps, ignore_index=True)
     snaps.attrs["snap_keys"] = snap_keys  # saved with snapshots.parquet, so the next run can reuse these seasons
+
+    # --- second Kalman pass: start each season from the roster-based prior instead of the league average. The
+    # prior needs de-leaked player values, which need the first pass, so the first pass stays for that step only.
+    pri_tab = pd.concat([pr.assign(season=s) for s, pr in priors_used.items()], ignore_index=True)
+    pri_tab[["season", "team", "eff_o", "eff_d"]].to_parquet(PROC / "priors.parquet")  # also read by ratings/tune.py
+    if KAL.load_params().prior_w > 0:
+        prior_map = {(s, t): (o, d) for s, t, o, d in pri_tab[["season", "team", "eff_o", "eff_d"]].itertuples(index=False)}
+        kpre, keng = KAL.pregame(g, cont, prior=prior_map)
+        print("  kalman ratings: second pass from the roster prior", flush=True)
 
     # --- elo
     elo_g, elo_final = ELO.run(g)

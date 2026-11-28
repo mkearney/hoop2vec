@@ -166,4 +166,30 @@ def availability(meta: pd.DataFrame, players: pd.DataFrame):
                         "injury": getattr(r, "injury", ""), "avail": a, "source": src})
             if pid is not None:
                 out[(team, int(pid))] = a  # manual rows come last and win
-    return out, pd.DataFrame(rep)
+    report = pd.DataFrame(rep)
+    archive(report)
+    return out, report
+
+
+def archive(report: pd.DataFrame) -> None:
+    """Keep each day's injury report in history/<league>/injuries_<season>.parquet, which the daily job commits.
+    Injury feeds are snapshots that are gone the next day; a season of them is what it takes to learn what a
+    "questionable" tag is worth and to backtest with real injury news. One snapshot per date (the latest run wins)."""
+    from ..config import HIST, current_season
+    if report is None or report.empty:
+        return
+    try:
+        f = HIST / f"injuries_{current_season()}.parquet"
+        snap = report.assign(date=today().isoformat(),
+                             fetched=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"))
+        snap["pid"] = pd.to_numeric(snap["pid"], errors="coerce").astype("Int64")
+        for c in ("team", "player", "status", "injury", "source"):
+            snap[c] = snap[c].astype("string")
+        old = pd.read_parquet(f) if f.exists() else None
+        if old is not None:
+            old = old[old["date"] != snap["date"].iloc[0]]
+            snap = pd.concat([old, snap], ignore_index=True)
+        HIST.mkdir(parents=True, exist_ok=True)
+        snap.to_parquet(f, index=False, compression="zstd", compression_level=19)
+    except Exception as e:  # the archive must never stop a refresh
+        print("  injury archive:", e)

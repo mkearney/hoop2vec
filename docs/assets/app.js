@@ -1437,12 +1437,13 @@
       const keys = bt.models.map((m) => m.key);
       const label = Object.fromEntries(bt.models.map((m) => [m.key, m.label]));
       const short = Object.fromEntries(bt.models.map((m) => [m.key, m.short || m.label]));
+      const bench = { market: "<i>Betting line (benchmark only)</i>", torvik: "<i>T-Rank pre-game probability (benchmark only)</i>" };
       const table = (sub, title, withMarket) => {
         const r = bt.subsets[sub]; if (!r) return "";
-        const ks = keys.filter((k) => r[k]).concat(withMarket && r.market ? ["market"] : []);
-        const best = Math.min(...ks.filter((k) => k !== "market").map((k) => r[k].log_loss));
+        const ks = keys.filter((k) => r[k]).concat(withMarket ? ["market", "torvik"].filter((k) => r[k]) : []);
+        const best = Math.min(...ks.filter((k) => !bench[k]).map((k) => r[k].log_loss));
         return `<h3 style="margin-top:18px">${title}</h3><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Model</th><th class="nosort">Games</th><th class="nosort">Log loss ↓</th><th class="nosort">Brier ↓</th><th class="nosort">Accuracy ↑</th><th class="nosort">RMSE ↓</th></tr></thead><tbody>
-          ${ks.map((k) => `<tr><td class="l">${k === "market" ? "<i>Betting line (benchmark only)</i>" : esc(label[k])}${k === bt.final ? ` <span class="pill acc">live model</span>` : ""}</td><td class="num">${r[k].n.toLocaleString()}</td><td class="num ${r[k].log_loss === best ? "best" : ""}">${fmt(r[k].log_loss, 4)}</td><td class="num">${fmt(r[k].brier, 4)}</td><td class="num">${pct(r[k].accuracy, 1)}</td><td class="num">${fmt(r[k].rmse, 2)}</td></tr>`).join("")}
+          ${ks.map((k) => `<tr><td class="l">${bench[k] || esc(label[k])}${k === bt.final ? ` <span class="pill acc">live model</span>` : ""}</td><td class="num">${r[k].n.toLocaleString()}</td><td class="num ${r[k].log_loss === best ? "best" : ""}">${fmt(r[k].log_loss, 4)}</td><td class="num">${fmt(r[k].brier, 4)}</td><td class="num">${pct(r[k].accuracy, 1)}</td><td class="num">${isNum(r[k].rmse) ? fmt(r[k].rmse, 2) : "–"}</td></tr>`).join("")}
           </tbody></table></div>`;
       };
       const ps = bt.per_season || [];
@@ -1454,6 +1455,9 @@
         <p>Lines are a benchmark only, never a model input. ESPN stores two kinds. Real sportsbook lines (DraftKings, 2025-26) are sharp: the market beats the model by about 0.005 log loss over a season and is level with it in March. That's the honest result, since no public-data model should expect to beat a closing book. Older "consensus" lines (2015–2023) are soft, especially in November, so the model beats them. Any model that beats <i>sportsbook</i> lines by a wide margin should be checked for leakage first. That check is how the original roster leak was found.</p>
         ${table("book_line_games", "Games with a sportsbook line (DraftKings)", true)}
         ${table("consensus_line_games", "Games with an ESPN consensus line", true)}
+        ${bt.subsets.torvik_games ? `<h3 style="margin-top:22px">Against T-Rank</h3>
+        <p>barttorvik.com keeps T-Rank's own win probability for every game it has played since 2015. It's written before tip-off and left alone afterward: this season's stored numbers were checked against a later download and none had changed. Like the lines, it's a benchmark only, never an input. The stored numbers are rounded to whole percents, so they're scored as no closer than 0.5 percent to a sure thing.</p>
+        ${table("torvik_games", "Games with a T-Rank pre-game probability", true)}` : ""}
         ${ps.length ? `<h3 style="margin-top:18px">NCAA tournament log loss by season</h3><div class="card flush tbl-wrap"><table><thead><tr><th class="l nosort">Season</th><th class="nosort">Games</th>${psKeys.map((k) => `<th class="nosort" title="${esc(label[k])}">${esc(short[k])}</th>`).join("")}</tr></thead><tbody>
           ${ps.map((s) => { const m = Math.min(...psKeys.map((k) => s[k]).filter(isNum)); return `<tr><td class="l">${s.season}</td><td class="num">${s.n}</td>${psKeys.map((k) => `<td class="num ${s[k] === m ? "best" : ""}">${fmt(s[k], 3)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>` : ""}`;
     }

@@ -113,27 +113,42 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
     rec = ps[["season", "pid", "rec_rank"]].drop_duplicates(["season", "pid"])
     r = roster.merge(prev, on=["season", "pid"], how="left").merge(rec, on=["season", "pid"], how="left")
 
-    # class progression (fit: mean change in BPM for returning players, by previous class)
+    # Population fits (class progression, the recruiting slope, the pro newcomer level) for each season use only
+    # earlier seasons, never the current one, so a backtest season's priors never learn from that season or later.
     both = ps[["season", "pid", "bpm", "mins"]].merge(prev, on=["season", "pid"])
-    both = both[(both["mins"] > 200) & (both["p_mins"] > 200)]
-    prog = (both.assign(d=both["bpm"] - both["p_bpm"]).groupby("p_cls")["d"].mean()).to_dict()
-    # newcomer prior from recruiting rank (fit on first-season players)
-    first = ps[~ps.set_index(["season", "pid"]).index.isin(prev.set_index(["season", "pid"]).index)]
-    first = first[(first["mins"] > 150) & first["rec_rank"].notna()]
-    if len(first) > 50:
-        b1, b0 = np.polyfit(first["rec_rank"], first["bpm"], 1, w=np.sqrt(first["mins"]))
-    else:
-        b1, b0 = 0.08, -6.0
-    newcomer_base = -4.5  # unranked newcomers (incl. low-major transfers w/o data)
+    both = both[(both["mins"] > 200) & (both["p_mins"] > 200)].assign(d=lambda x: x["bpm"] - x["p_bpm"])
+    is_first = ~ps.set_index(["season", "pid"]).index.isin(prev.set_index(["season", "pid"]).index)
+    first = ps[is_first & (ps["mins"] > 150) & ps["rec_rank"].notna()]
     from .config import PRO_LEAGUE
-    if PRO_LEAGUE:  # no recruiting ranks: newcomers start at the minute-weighted mean of past first-season players
-        new = ps[~ps.set_index(["season", "pid"]).index.isin(prev.set_index(["season", "pid"]).index)]
-        new = new[(new["season"] > ps["season"].min()) & (new["mins"] > 150) & new["bpm"].notna()]
-        if len(new) > 50:
-            newcomer_base = float(np.average(new["bpm"], weights=new["mins"]))
+    new = ps[is_first & (ps["season"] > ps["season"].min()) & (ps["mins"] > 150) & ps["bpm"].notna()]
+
+    def fit(upto):
+        """(class progression, recruiting slope and intercept, newcomer level) from seasons before ``upto``,
+        or None for a piece without enough data yet."""
+        b = both[both["season"] < upto]
+        prog = b.groupby("p_cls")["d"].mean().to_dict() if len(b) > 200 else None
+        f = first[first["season"] < upto]
+        rec = tuple(np.polyfit(f["rec_rank"], f["bpm"], 1, w=np.sqrt(f["mins"]))) if len(f) > 50 else None
+        base = -4.5  # unranked newcomers (incl. low-major transfers w/o data)
+        if PRO_LEAGUE:  # no recruiting ranks: newcomers start at the minute-weighted mean of past first-season players
+            n = new[new["season"] < upto]
+            base = float(np.average(n["bpm"], weights=n["mins"])) if len(n) > 50 else None
+        return prog, rec, base
+
+    cur = current_season()
+    seasons = sorted(r["season"].unique())
+    fits = {s: fit(min(s, cur)) for s in seasons}
+    # the first seasons (training data only) borrow the earliest fit that has enough data; failing that, defaults
+    default = ({}, (0.08, -6.0), -4.5)
+    earliest = [next((fits[s][k] for s in seasons if fits[s][k] is not None), default[k]) for k in range(3)]
+    fits = {s: tuple(v if v is not None else earliest[k] for k, v in enumerate(fs)) for s, fs in fits.items()}
+    b1 = r["season"].map({s: f[1][0] for s, f in fits.items()}).to_numpy(float)
+    b0 = r["season"].map({s: f[1][1] for s, f in fits.items()}).to_numpy(float)
+    newcomer_base = r["season"].map({s: f[2] for s, f in fits.items()}).to_numpy(float)
 
     shrink = r["p_mins"].fillna(0) / (r["p_mins"].fillna(0) + 250.0)
-    bump = r["p_cls"].map(prog).fillna(0.0)
+    bump = pd.Series([fits[s][0].get(c, 0.0) if pd.notna(c) else 0.0 for s, c in zip(r["season"], r["p_cls"])],
+                     index=r.index, dtype=float)
     fresh = np.where(r["rec_rank"].notna(), b0 + b1 * r["rec_rank"].fillna(0), newcomer_base)
     base = np.where(r["p_bpm"].notna(), shrink * r["p_bpm"].fillna(0) + (1 - shrink) * (-3.0), fresh)
     r["prior_v"] = base + bump

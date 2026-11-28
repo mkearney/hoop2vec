@@ -134,7 +134,8 @@ def stage_features(games, meta, pg, ps, conf):
 
 def training_rows(feat):
     f = BT.add_derived(feat)
-    return f[(f["season"] >= FIRST_TRAIN_SEASON) & (f["season"] < current_season()) & f["played"] & f["margin"].notna()]
+    f = f[(f["season"] >= FIRST_TRAIN_SEASON) & (f["season"] < current_season()) & f["played"] & f["margin"].notna()]
+    return BT.training_view(f)
 
 
 def stage_train(feat, n_models=TR.N_MODELS):

@@ -31,9 +31,25 @@ def season_means(feat: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(cols)
 
 
-def team_matrix(df: pd.DataFrame, side: str, smeans: pd.DataFrame, feats=None) -> np.ndarray:
+def season_means_asof(df: pd.DataFrame) -> pd.DataFrame:
+    """Per-row league means of the centred columns over games on or before each row's date in its season, i.e. what
+    was known that day (every row's features are pre-game). Training and backtests centre with these, so a test game
+    in November is never centred with a mean that includes February. Live predictions use the season so far."""
+    parts = []
+    for side in ("a", "b"):
+        x = df[["season", "date"] + [f"{side}_{c}" for c in CENTER_SEASON]]
+        parts.append(x.set_axis(["season", "date"] + CENTER_SEASON, axis=1))
+    long = pd.concat(parts, ignore_index=True)
+    g = long.groupby(["season", "date"])[CENTER_SEASON]
+    tot, cnt = g.sum().groupby(level=0).cumsum(), g.count().groupby(level=0).cumsum()
+    means = tot / cnt.where(cnt > 0)
+    return means.reindex(pd.MultiIndex.from_arrays([df["season"], df["date"]])).set_axis(df.index)
+
+
+def team_matrix(df: pd.DataFrame, side: str, smeans: pd.DataFrame, feats=None,
+                row_means: pd.DataFrame | None = None) -> np.ndarray:
     out = []
-    sm = smeans.reindex(df["season"].to_numpy())
+    sm = row_means if row_means is not None else smeans.reindex(df["season"].to_numpy())
     for c in feats or TEAM_FEATS:
         v = df[f"{side}_{c}"].to_numpy(float).copy()
         if c in CENTER_SEASON:
@@ -74,9 +90,9 @@ class Normalizer:
         return {"mean": self.mean.tolist(), "std": self.std.tolist()}
 
 
-def prepare(df, smeans, norm=None, feats=None):
-    xa = team_matrix(df, "a", smeans, feats)
-    xb = team_matrix(df, "b", smeans, feats)
+def prepare(df, smeans, norm=None, feats=None, row_means=None):
+    xa = team_matrix(df, "a", smeans, feats, row_means)
+    xb = team_matrix(df, "b", smeans, feats, row_means)
     if norm is None:
         norm = Normalizer().fit(xa, xb)
     return norm(xa), norm(xb), ctx_matrix(df), norm
@@ -85,13 +101,13 @@ def prepare(df, smeans, norm=None, feats=None):
 def train_models(df: pd.DataFrame, smeans, n_models=N_MODELS, epochs=EPOCHS, seed=0, verbose=False,
                  val: pd.DataFrame | None = None, feats=None):
     df = df[df["played"] & df["margin"].notna()]
-    xa, xb, cx, norm = prepare(df, smeans, feats=feats)
+    xa, xb, cx, norm = prepare(df, smeans, feats=feats, row_means=season_means_asof(df))
     y = df["margin"].to_numpy(float)
     w = np.where(df["is_post"] > 0, 1.5, 1.0) * np.where((df["a_games"] < 3) | (df["b_games"] < 3), 0.6, 1.0)
     T = lambda a: torch.tensor(a, dtype=torch.float32)  # noqa: E731
     xa_t, xb_t, cx_t, y_t, w_t = map(T, (xa, xb, cx, y, w))
     if val is not None:
-        vxa, vxb, vcx, _ = prepare(val, smeans, norm, feats=feats)
+        vxa, vxb, vcx, _ = prepare(val, smeans, norm, feats=feats, row_means=season_means_asof(val))
         vy = val["margin"].to_numpy(float)
     models = []
     n = len(y)
@@ -143,8 +159,8 @@ def predict_raw(models, xa, xb, cx):
     return mu, np.sqrt(var)
 
 
-def predict_df(models, norm, smeans, df, feats=None):
-    xa, xb, cx, _ = prepare(df, smeans, norm, feats=feats)
+def predict_df(models, norm, smeans, df, feats=None, row_means=None):
+    xa, xb, cx, _ = prepare(df, smeans, norm, feats=feats, row_means=row_means)
     mu, sg = predict_raw(models, xa, xb, cx)
     return mu, sg, norm_cdf(mu / sg)
 

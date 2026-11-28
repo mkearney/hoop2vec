@@ -6,7 +6,10 @@ each with a variance. For each game, A's offensive efficiency y = 100*ptsA/poss 
     y = mu + o_A + d_B + h*loc_A + e,   Var(e) = R * 70/poss
 Updates use a diagonal (per-team independent) Kalman step; residuals are Huber-capped so blowouts
 don't swamp the signal. Between games team variances grow by q per day; between seasons ratings
-regress toward a prior whose weight depends on returning minutes (roster continuity).
+regress toward a prior whose weight depends on returning minutes (roster continuity). With ``prior_w`` > 0 that
+prior is the roster-based preseason rating (features.make_prior) instead of the league average, and with
+``luck3_d`` > 0 the defensive update discounts that share of the opponent's 3-point shooting luck (made threes
+above or below the league rate on its attempts), which is mostly noise from the defense's side.
 
 Every game gets the PRE-game state recorded, so the output is leak-free by construction.
 """
@@ -35,6 +38,8 @@ class RatingParams:
     tR: float = 9.0             # tempo obs noise
     tq: float = 0.01
     t_rho: float = 0.6
+    prior_w: float = 0.0        # season start: shrink toward prior_w x the roster-based prior instead of toward 0
+    luck3_d: float = 0.0        # share of the opponent's 3-point luck the defensive update ignores
 
 
 class RatingEngine:
@@ -42,8 +47,9 @@ class RatingEngine:
         self.p = params or RatingParams()
 
     def run(self, games: pd.DataFrame, cont: pd.DataFrame | None = None, record: bool = True,
-            init: pd.DataFrame | None = None, init_mu: tuple | None = None):
-        """init: saved end-of-season state (team_id, o, d, t, Po, Pd, Pt, season) to continue from."""
+            init: pd.DataFrame | None = None, init_mu: tuple | None = None, prior: dict | None = None):
+        """init: saved end-of-season state (team_id, o, d, t, Po, Pd, Pt, season) to continue from.
+        prior: {(season, team_id): (o, d)} roster-based preseason ratings (used when params.prior_w > 0)."""
         p = self.p
         g = games.sort_values(["date", "game_id"]).reset_index(drop=True)
         ids = np.r_[g["home_id"].to_numpy(), g["away_id"].to_numpy()]
@@ -74,6 +80,13 @@ class RatingEngine:
             for r in cont.itertuples():
                 cmap[(r.season, r.team_id)] = (r.returning, r.transfer_in)
         mu, mu_t = init_mu if init_mu else (103.0, 68.0)
+        prior = prior if (prior and p.prior_w > 0) else {}
+        luck = p.luck3_d > 0 and {"home_tpm", "home_tpa", "away_tpm", "away_tpa"} <= set(g.columns)
+        if luck:  # threes made and tried by each side; the league rate is a running estimate (point-in-time)
+            tpm = np.nan_to_num(np.c_[g["home_tpm"].to_numpy(float), g["away_tpm"].to_numpy(float)])
+            tpa = np.nan_to_num(np.c_[g["home_tpa"].to_numpy(float), g["away_tpa"].to_numpy(float)])
+            first = slice(0, min(len(g), 500))
+            p3 = tpm[first].sum() / max(tpa[first].sum(), 1.0)
         out = np.zeros((len(g), 12)) if record else None
         cur_season = None
         first_season = (season.min() if len(season) else None) if init is None else -1
@@ -90,7 +103,12 @@ class RatingEngine:
                     else:
                         ret, tin = cmap.get((s, teams[k]), (0.55, 0.05))
                         rho = np.clip(p.rho0 + p.rho1 * ret + p.rho_t * tin, 0, 1)
-                        o[k] *= rho; d[k] *= rho
+                        po, pd_ = prior.get((s, teams[k]), (np.nan, np.nan))
+                        if np.isfinite(po) and np.isfinite(pd_):
+                            o[k] = rho * o[k] + (1 - rho) * p.prior_w * po
+                            d[k] = rho * d[k] + (1 - rho) * p.prior_w * pd_
+                        else:
+                            o[k] *= rho; d[k] *= rho
                         Po[k] = rho ** 2 * Po[k] + p.carry_var
                         Pd[k] = rho ** 2 * Pd[k] + p.carry_var
                         t[k] *= p.t_rho; Pt[k] = p.t_rho ** 2 * Pt[k] + 4.0
@@ -104,12 +122,16 @@ class RatingEngine:
                 out[i] = (o[A], d[A], o[B], d[B], Po[A], Pd[A], Po[B], Pd[B], t[A], t[B], mu, mu_t)
             Rg = p.R * 70.0 / poss[i]
             # home offense vs away defense
-            for (off, de, y, sgn) in ((A, B, yh[i], 1.0), (B, A, ya[i], -1.0)):
+            for (off, de, y, sgn, j) in ((A, B, yh[i], 1.0, 0), (B, A, ya[i], -1.0, 1)):
                 pred = mu + o[off] + d[de] + sgn * p.h * loc[i]
                 r = np.clip(y - pred, -p.cap, p.cap)
+                rd = r
+                if luck:
+                    lk = 100 * 3 * (tpm[i, j] - tpa[i, j] * p3) / poss[i]  # pts/100 from threes vs the league rate
+                    rd = np.clip(y - p.luck3_d * lk - pred, -p.cap, p.cap)
                 S = Po[off] + Pd[de] + Rg
                 o[off] += Po[off] / S * r
-                d[de] += Pd[de] / S * r
+                d[de] += Pd[de] / S * rd
                 Po[off] -= Po[off] ** 2 / S
                 Pd[de] -= Pd[de] ** 2 / S
                 mu += 0.002 * (y - sgn * p.h * loc[i] - mu)
@@ -120,6 +142,8 @@ class RatingEngine:
             t[A] += Pt[A] / S * r; t[B] += Pt[B] / S * r
             Pt[A] -= Pt[A] ** 2 / S; Pt[B] -= Pt[B] ** 2 / S
             mu_t += 0.002 * (tempo[i] - mu_t)
+            if luck and tpa[i].sum() > 0:
+                p3 += 0.002 * (tpm[i].sum() / tpa[i].sum() - p3)
         self.state = dict(teams=teams, o=o, d=d, t=t, Po=Po, Pd=Pd, Pt=Pt, mu=mu, mu_t=mu_t,
                           season=seen_season, last_day=last, day0=g["date"].min())
         if not record:
@@ -159,11 +183,16 @@ PARAMS_FILE = "rating_params.json"
 
 
 def load_params() -> RatingParams:
+    """The league's tuned settings (artifacts/<league>/rating_params.json, else the defaults), with any single
+    settings overridden by HOOP2VEC_RATING_PARAMS (a JSON object; used by research/experiment.py)."""
     import json
+    import os
 
     from ..config import ARTIFACTS
     f = ARTIFACTS / PARAMS_FILE
-    return RatingParams(**json.loads(f.read_text())) if f.exists() else RatingParams()
+    d = json.loads(f.read_text()) if f.exists() else {}
+    d.update(json.loads(os.environ.get("HOOP2VEC_RATING_PARAMS") or "{}"))
+    return RatingParams(**d)
 
 
 def to_engine_games(games: pd.DataFrame) -> pd.DataFrame:
@@ -180,7 +209,8 @@ def to_engine_games(games: pd.DataFrame) -> pd.DataFrame:
         "neutral": (g["loc"] == 0).to_numpy(), "poss": g["poss"].to_numpy(float),
         "minutes": (g["minutes"].fillna(5 * GAME_MINUTES).clip(lower=5 * GAME_MINUTES) / 5.0).to_numpy(float),
         "a_home": a_home,
-    })
+    } | ({f"{side}_{c}": np.where(a_home == (side == "home"), g[f"a_{c}"], g[f"b_{c}"]).astype(float)
+          for side in ("home", "away") for c in ("tpm", "tpa")} if {"a_tpm", "a_tpa"} <= set(g.columns) else {}))
 
 
 def continuity(pg: pd.DataFrame) -> pd.DataFrame:
@@ -204,14 +234,15 @@ def continuity(pg: pd.DataFrame) -> pd.DataFrame:
     return c
 
 
-def pregame(games: pd.DataFrame, cont: pd.DataFrame, params: RatingParams | None = None):
-    """Pre-game Kalman state for every played D-I game, re-keyed to team_a/team_b.
+def pregame(games: pd.DataFrame, cont: pd.DataFrame, params: RatingParams | None = None, prior: dict | None = None):
+    """Pre-game Kalman state for every played D-I game, re-keyed to team_a/team_b. ``prior``: roster-based
+    preseason ratings {(season, team): (o, d)}, used when the league's settings have prior_w > 0.
 
     Returns (per-game frame keyed by gid with a_k_o, a_k_d, a_k_t, a_k_sd, b_..., k_mu, k_mut), engine)."""
     p = params or load_params()
     G = to_engine_games(games)
     eng = RatingEngine(p)
-    pre = eng.run(G.drop(columns=["a_home", "gid"]), cont)
+    pre = eng.run(G.drop(columns=["a_home", "gid"]), cont, prior=prior)
     pre = pre.set_index("game_id").reindex(G["game_id"]).reset_index()
     ah = G["a_home"].to_numpy()
     pick = lambda h, a: np.where(ah, pre[h].to_numpy(), pre[a].to_numpy())  # noqa: E731
