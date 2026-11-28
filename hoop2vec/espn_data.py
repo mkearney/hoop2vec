@@ -413,7 +413,7 @@ def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame, refit
     exp_now = pb["athlete_id"].map(ath["exp"])
     pb["cls"] = cls_label(exp_now - (last - pb["season"]))
     pb["inches"] = pb["athlete_id"].map(ath["height"])
-    if PRO_LEAGUE:  # box model fitted to lineup RAPM (rapm.py) instead of the team-level fit + height correction
+    if rapm_values():  # box model fitted to lineup RAPM (rapm.py) instead of the team-level fit + height correction
         _rapm_values(pb, games, kpre, d, refit_box)
         gam = None
     else:
@@ -429,6 +429,15 @@ def player_games(games: pd.DataFrame, d: pd.DataFrame, kpre: pd.DataFrame, refit
             "bpm", "obpm", "dbpm", "pts", "poss", "pos"] + BOX[:-1] + ["twopm", "twopa"]
     keep = list(dict.fromkeys(c for c in keep if c in pb.columns))
     return pb[keep]
+
+
+RAPM_COLLEGE: set = set()  # college leagues whose player values also come from lineups (research/accuracy_plan.md)
+
+
+def rapm_values() -> bool:
+    """Player values from lineup RAPM (pros, and college leagues in RAPM_COLLEGE or HOOP2VEC_RAPM_COLLEGE=1)."""
+    import os
+    return PRO_LEAGUE or LEAGUE in RAPM_COLLEGE or os.environ.get("HOOP2VEC_RAPM_COLLEGE") == "1"
 
 
 def _rapm_values(pb: pd.DataFrame, games, kpre, d, refit: bool):

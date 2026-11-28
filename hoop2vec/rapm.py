@@ -76,8 +76,13 @@ def fit_rapm(L: pd.DataFrame, lam: float = LAMBDA, h: float = 1.5):
         y = np.asarray(y, float)
         ok = (w > 0) & np.isfinite(y)
         Xw = X[ok].multiply(w[ok][:, None]).tocsr()
-        A = (X[ok].T @ Xw).toarray() + lam * np.eye(n)
-        b = np.linalg.solve(A, Xw.T @ y[ok])
+        if n > 3000:  # college: thousands of players, but only teammates share the floor, so the system is sparse
+            from scipy.sparse.linalg import spsolve
+            A = (X[ok].T @ Xw).tocsc() + lam * sparse.identity(n, format="csc")
+            b = spsolve(A, np.asarray(Xw.T @ y[ok]).ravel())
+        else:
+            A = (X[ok].T @ Xw).toarray() + lam * np.eye(n)
+            b = np.linalg.solve(A, Xw.T @ y[ok])
         out[kind] = pd.Series(b, index=players)
     poss = pd.Series(np.asarray(X.T @ (L["off_poss"] + L["def_poss"]).to_numpy(float)).ravel() / 2, index=players)
     return pd.DataFrame({"o": out["o"], "d": out["d"], "poss": poss})

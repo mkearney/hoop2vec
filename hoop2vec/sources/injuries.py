@@ -135,10 +135,11 @@ def manual() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def availability(meta: pd.DataFrame, players: pd.DataFrame):
+def availability(meta: pd.DataFrame, players: pd.DataFrame, rates: dict | None = None):
     """Return ({(team, pid): p_available}, report DataFrame).
 
-    ``players``: current-season roster (team, pid, player)."""
+    ``players``: current-season roster (team, pid, player). ``rates``: measured P(plays) by status
+    (status_rates), used in place of the fixed STATUS values where the archive has enough cases."""
     match_team = team_matcher(meta)
     roster = players.assign(nk=players["player"].map(norm_name))
     idx = {(t, n): p for t, n, p in zip(roster["team"], roster["nk"], roster["pid"])}
@@ -161,7 +162,7 @@ def availability(meta: pd.DataFrame, players: pd.DataFrame):
                 pid = by_last.get((team, nk.split()[-1]))
             st = str(r.status).strip().lower()
             a = getattr(r, "avail", None)
-            a = float(a) if a is not None and not pd.isna(a) else STATUS.get(st, 0.5 if "question" in st else 0.0)
+            a = float(a) if a is not None and not pd.isna(a) else status_value(r.status, rates)
             rep.append({"team": team, "player": r.player, "pid": pid, "status": r.status,
                         "injury": getattr(r, "injury", ""), "avail": a, "source": src})
             if pid is not None:
@@ -193,3 +194,76 @@ def archive(report: pd.DataFrame) -> None:
         snap.to_parquet(f, index=False, compression="zstd", compression_level=19)
     except Exception as e:  # the archive must never stop a refresh
         print("  injury archive:", e)
+
+
+# ------------------------------------------------------------------ the archive as model input
+MIN_STATUS_CASES = 30  # a status's own measured rate replaces its fixed value once it has this many cases
+
+
+def _status_key(st) -> str:
+    st = str(st).strip().lower()
+    for k in ("out for season", "out", "doubtful", "questionable", "game time decision", "day-to-day", "probable",
+              "suspended", "available", "active"):
+        if st.startswith(k):
+            return k
+    return "question" if "question" in st else st
+
+
+def _raw_archive() -> pd.DataFrame:
+    from ..config import HIST
+    frames = []
+    for f in sorted(HIST.glob("injuries_*.parquet")):
+        d = pd.read_parquet(f)
+        d["season"] = int(f.stem.split("_")[-1])
+        frames.append(d)
+    if not frames:
+        return pd.DataFrame(columns=["season", "date", "team", "pid", "status", "source", "avail"])
+    d = pd.concat(frames, ignore_index=True)
+    d = d[d["pid"].notna()].copy()
+    d["pid"] = d["pid"].astype(int)
+    d["key"] = d["status"].map(_status_key)
+    return d
+
+
+def status_rates(pg: pd.DataFrame, archive: pd.DataFrame | None = None) -> dict:
+    """P(plays) for each report status, measured from the archive: a report dated the day the player's team played,
+    and whether he logged minutes that day. Statuses with fewer than MIN_STATUS_CASES cases keep the fixed STATUS
+    values. Hand-entered overrides are left out (they carry their own availability)."""
+    d = _raw_archive() if archive is None else archive
+    d = d[d["source"] != "manual"]
+    if d.empty or pg is None or pg.empty:
+        return {}
+    q = pg[["date", "team", "pid", "min"]].dropna(subset=["pid"]).copy()
+    q["date"] = pd.to_datetime(q["date"]).dt.strftime("%Y-%m-%d")
+    q["pid"] = q["pid"].astype(int)
+    played_days = set(zip(q["date"], q["team"]))
+    on = set(zip(q.loc[q["min"] > 0, "date"], q.loc[q["min"] > 0, "team"], q.loc[q["min"] > 0, "pid"]))
+    d = d[[(a, b) in played_days for a, b in zip(d["date"], d["team"])]]
+    if d.empty:
+        return {}
+    d = d.drop_duplicates(["date", "team", "pid"], keep="last")
+    d["played"] = [(a, b, c) in on for a, b, c in zip(d["date"], d["team"], d["pid"])]
+    g = d.groupby("key")["played"].agg(["mean", "size"])
+    return {k: float(r["mean"]) for k, r in g.iterrows() if r["size"] >= MIN_STATUS_CASES}
+
+
+def status_value(status, rates: dict | None = None) -> float:
+    k = _status_key(status)
+    if rates and k in rates:
+        return rates[k]
+    st = str(status).strip().lower()
+    return STATUS.get(st, 0.5 if "question" in st else 0.0)
+
+
+def load_archive(pg: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Archived reports as model input: (season, date, team, pid, avail), one row per player and date. Feed rows get
+    the measured status rates where the archive has enough cases; hand-entered rows keep their own value."""
+    d = _raw_archive()
+    if d.empty:
+        return pd.DataFrame(columns=["season", "date", "team", "pid", "avail"])
+    rates = status_rates(pg, d) if pg is not None else {}
+    feed = d["source"] != "manual"
+    d.loc[feed, "avail"] = [status_value(s, rates) for s in d.loc[feed, "status"]]
+    d["manual"] = ~feed
+    d = d.sort_values(["date", "manual"]).drop_duplicates(["date", "team", "pid"], keep="last")  # overrides win
+    return d[["season", "date", "team", "pid", "avail"]].reset_index(drop=True)

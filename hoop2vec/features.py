@@ -203,7 +203,8 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
     # --- players (Torvik game values re-based on pre-game opponent strength)
     pg = PL.deleak_bpm(pg, g, kpre, conf)
     pri = PL.player_priors(ps, pg)
-    pf, live_players = PL.team_player_features(g, pg, pri, availability)
+    from .sources import injuries as INJ
+    pf, live_players = PL.team_player_features(g, pg, pri, availability, reports=INJ.load_archive(pg))
     # roster strength at season start (for preseason priors)
     first_gid = (pd.concat([g[["season", "date", "gid", "team_a"]].rename(columns={"team_a": "team"}),
                             g[["season", "date", "gid", "team_b"]].rename(columns={"team_b": "team"})])

@@ -222,11 +222,14 @@ def player_priors(ps: pd.DataFrame, pg: pd.DataFrame) -> pd.DataFrame:
 
 
 def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataFrame,
-                         availability: dict | None = None):
+                         availability: dict | None = None, reports: pd.DataFrame | None = None):
     """Point-in-time player-based features for every team-game, plus a live state.
 
     Returns (per_game DataFrame keyed by season/gid/team, live dict team->player table).
     ``availability``: {(team, pid): prob_available} used for the live (next game) state.
+    ``reports``: archived injury reports (season, date, team, pid, avail; sources/injuries.load_archive). Where a
+    player has a report dated the day of a game, it replaces the missed-games estimate in that game's pre-game
+    availability, in training and backtests alike.
     """
     from . import memo
     g = games[games["type"] != "nond1"]
@@ -237,11 +240,14 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         gs = g.loc[g["season"] == season, _G_COLS]
         ps_ = pgi.loc[pgi["season"] == season, _PG_COLS]
         pr = priors.loc[priors["season"] == season, _PRI_COLS]
+        rp = None if reports is None or reports.empty else reports[reports["season"] == season]
+        rp = rp if rp is not None and len(rp) else None
         if season < cur:  # completed season: an earlier run's result for the same inputs (no live injuries apply)
-            frames.append(memo.cached(f"player-feats-{season}", (gs, ps_, pr, _settings()), lambda: pd.DataFrame(
-                _season_player_features(gs, ps_, pr, {}, cur)[0], columns=_PF_COLS)))
+            parts = (gs, ps_, pr, _settings()) + ((rp,) if rp is not None else ())
+            frames.append(memo.cached(f"player-feats-{season}", parts, lambda: pd.DataFrame(
+                _season_player_features(gs, ps_, pr, {}, cur, rp)[0], columns=_PF_COLS)))
         else:
-            rows, lv = _season_player_features(gs, ps_, pr, availability or {}, cur)
+            rows, lv = _season_player_features(gs, ps_, pr, availability or {}, cur, rp)
             frames.append(pd.DataFrame(rows, columns=_PF_COLS))
             live.update(lv)
     return pd.concat(frames, ignore_index=True), live
@@ -262,7 +268,8 @@ _PF_COLS = ["season", "gid", "team", "roster", "roster_o", "roster_d", "avail_de
             "star", "bench", "continuity", "avail_delta_pre"]
 
 
-def _season_player_features(g: pd.DataFrame, pgi: pd.DataFrame, priors: pd.DataFrame, availability: dict, cur: int):
+def _season_player_features(g: pd.DataFrame, pgi: pd.DataFrame, priors: pd.DataFrame, availability: dict, cur: int,
+                            reports: pd.DataFrame | None = None):
     """team_player_features for one season's games (D-I only), player games (min > 0) and priors: (rows, live)."""
     def num(col, fill=np.nan):  # nullable/NA-safe -> plain float64
         return pd.to_numeric(priors[col], errors="coerce").astype("float64").fillna(fill).to_numpy()
@@ -279,6 +286,11 @@ def _season_player_features(g: pd.DataFrame, pgi: pd.DataFrame, priors: pd.DataF
     ])
     long["minutes"] = long["minutes"].fillna(5 * GAME_MINUTES)
     pg_by = {k: v for k, v in pgi.groupby(["season", "team"])}
+    rep_by = {}
+    if reports is not None:
+        for t, x in reports.groupby("team"):
+            rep_by[t] = {(d, int(p)): float(v) for d, p, v in zip(pd.to_datetime(x["date"]).dt.strftime("%Y-%m-%d"),
+                                                                  x["pid"], x["avail"])}
     for (season, team), tg in long.groupby(["season", "team"]):
         tg = tg.sort_values("date")
         played = tg[tg["played"]]
@@ -357,6 +369,13 @@ def _season_player_features(g: pd.DataFrame, pgi: pd.DataFrame, priors: pd.DataF
         # pre-game knowable availability (recent missed games only) for honest backtests
         is_post = played["type"].isin(["post", "conftourney"]).to_numpy()
         Apre = _heuristic_avail_matrix(P, int(np.argmax(is_post)) if is_post.any() else None)
+        rt = rep_by.get(team)
+        if rt:  # an injury report from the morning of a game beats the missed-games guess
+            for j, d in enumerate(pd.to_datetime(played["date"]).dt.strftime("%Y-%m-%d")):
+                for i, p in enumerate(pids):
+                    a = rt.get((d, p))
+                    if a is not None:
+                        Apre[j, i] = a
         delta_pre = ((Apre - part) * SP * (V - V_REPL)).sum(1)
         delta_pre[0] = 0.0
         delta_pre[n] = delta[n]

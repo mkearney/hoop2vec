@@ -121,7 +121,7 @@ def stage_features(games, meta, pg, ps, conf):
     season = current_season()
     cur = pg[pg["season"] == season][["team", "pid", "player"]].drop_duplicates("pid", keep="last")
     log("injury report")
-    avail, inj_report = INJ.availability(meta, cur)
+    avail, inj_report = INJ.availability(meta, cur, INJ.status_rates(pg))
     log(f"  {len(inj_report)} injury rows, {len(avail)} matched to players")
     log("building point-in-time features")
     feat, snaps, live, extras = F.build(games, pg, ps, conf, availability=avail)
