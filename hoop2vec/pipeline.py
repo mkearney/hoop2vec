@@ -4,9 +4,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+import os
 import pickle
 import re
 import time
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -280,8 +282,9 @@ def stage_publish(games, meta, pg, conf, feat, snaps, live, extras, inj_report, 
     st["sos"] = pd.Series(sos)
     st["sos_rank"] = st["sos"].rank(ascending=False, method="min")
     hist = update_power_history(st["rank"])
-    prev_i = max(0, len(hist["dates"]) - 8)
-    st["rank_prev"] = [(hist["ranks"].get(t) or [None] * len(hist["dates"]))[prev_i] if len(hist["dates"]) > 1 else None
+    # rank_prev = rank on the previous day in the history (the day before today), for the daily ▲▼ arrows
+    prev_i = len(hist["dates"]) - 2
+    st["rank_prev"] = [(hist["ranks"].get(t) or [None] * len(hist["dates"]))[prev_i] if prev_i >= 0 else None
                        for t in st.index]
     # live injury impact in points per game (at team tempo)
     st["injury_pts"] = st["avail_delta"].fillna(0) * st["adjt"] / 100
@@ -443,7 +446,9 @@ def season_tracking(feat, season, bundle, starts: dict | None = None):
 def update_power_history(rank: pd.Series) -> dict:
     f = SITE_DATA / "power_history.json"
     h = json.loads(f.read_text()) if f.exists() else {"dates": [], "ranks": {}}
-    day = today().isoformat()
+    # One column per US Eastern day, so live runs after ~7pm ET (past midnight UTC) still update today's column
+    # instead of starting tomorrow's. HOOP2VEC_TODAY (tests, backfills) wins when set.
+    day = (today() if os.environ.get("HOOP2VEC_TODAY") else dt.datetime.now(ZoneInfo("America/New_York")).date()).isoformat()
     if h["dates"] and h["dates"][-1] == day:  # re-run on the same day: replace today's column
         h["dates"].pop()
         h["ranks"] = {k: v[:len(h["dates"])] for k, v in h["ranks"].items()}

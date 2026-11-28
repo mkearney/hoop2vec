@@ -225,7 +225,7 @@
         ${seg("view", views, R.view)}
       </div>
       <div class="card flush tbl-wrap"><table id="tbl" class="ratings-table"></table></div>
-      <p class="note">Small numbers are national ranks. Shading runs from red (bottom) through clear (median) to blue (top). ▲▼ = change in Power rank over the last week.</p>`;
+      <p class="note">Small numbers are national ranks. Shading runs from red (bottom) through clear (median) to blue (top). ▲▼ = change in Power rank since yesterday.</p>`;
     $("#q").addEventListener("input", (e) => { R.q = e.target.value; drawRatings(); });
     $("#conf").addEventListener("change", (e) => { R.conf = e.target.value; drawRatings(); });
     onSeg("view", (v) => { R.view = v; if (!["rank", "team", "conf", "wins"].includes(R.sort)) { R.sort = "rank"; R.dir = 1; } drawRatings(); });
@@ -255,7 +255,7 @@
       let mv = "";
       if (isNum(t.rank_prev) && t.rank_prev !== t.rank) {
         const ch = t.rank_prev - t.rank;
-        if (Math.abs(ch) >= 2) mv = `<span class="mv ${ch > 0 ? "up" : "dn"}" title="Power rank change, last 7 days">${ch > 0 ? "▲" : "▼"}${Math.abs(ch)}</span>`;
+        mv = `<span class="mv ${ch > 0 ? "up" : "dn"}" title="Power rank change since yesterday">${ch > 0 ? "▲" : "▼"}${Math.abs(ch)}</span>`;
       }
       let cells;
       if (idView) {
