@@ -312,6 +312,63 @@ def chooser_page(summaries: dict | None = None) -> str:
 '''
 
 
+def team_page(league: str, t: dict, updated: str | None = None) -> str:
+    """One static page per team (docs/<league>/team/<slug>/): the team's line from today's ratings in plain HTML, so
+    search engines can index every team (the app's own team views are #/team/... routes, which they can't) and a shared
+    link shows the team's numbers. It links straight into the app's full team page."""
+    L, e = LEAGUES[league], html.escape
+    pro = league in PRO_LEAGUES
+    f = lambda v, d=1: "" if v is None else f"{v:.{d}f}"  # noqa: E731
+    sg = lambda v: "" if v is None else (lambda x: f"{'+' if x > 0 else '−' if x < 0 else ''}{abs(x):.1f}")(round(v, 1))  # noqa: E731
+    rk = lambda k: f" (#{int(t[k])})" if t.get(k) else ""  # noqa: E731
+    name, slug = t["team"], t["slug"]
+    n_teams = {"mens": "Division I", "womens": "Division I"}.get(league, L["name"])
+    record = f"{t.get('wins', 0)}-{t.get('losses', 0)}"
+    desc = (f"{name} {'' if pro else L['full'] + ' '}power rating: #{t['rank']} in {n_teams}, {sg(t.get('power'))} Power, "
+            f"{record}. Offense, defense, tempo, strength of schedule, roster, and forecasts, updated as games finish.").replace("  ", " ")
+    title = f"{name} {'' if pro else L['name'].lower() + ' basketball '}ratings and forecasts · hoop2vec".replace("  ", " ")
+    rows = [("Rank", f"#{t['rank']} in {n_teams}"), ("Record", record), ("Conference", t.get("conf") or ""),
+            ("Power", sg(t.get("power"))), ("Offense", f(t.get("eff_o")) + rk("eff_o_rank")),
+            ("Defense", f(t.get("eff_d")) + rk("eff_d_rank")), ("Tempo", f(t.get("adjt")) + rk("adjt_rank")),
+            ("Strength of schedule", sg(t.get("sos")) + rk("sos_rank")), ("Roster", sg(t.get("roster")) + rk("roster_rank"))]
+    table = "".join(f"<tr><th>{k}</th><td>{e(str(v))}</td></tr>" for k, v in rows if v not in ("", None))
+    return head(title=title, desc=desc, path=f"{league}/team/{slug}/", root="../../../", img=None, stamp=None, img_alt="",
+                S={}, league=league) + f'''<body data-league="{league}">
+  <header class="topbar"><div class="wrap topbar-inner"><a class="brand" href="../../../" aria-label="hoop2vec home">{LOGO}</a>
+    <nav class="nav" aria-label="Sections"><a href="../../#/ratings">{L['name']} ratings</a></nav></div></header>
+  <main class="wrap team-static">
+    <h1>{e(name)}</h1>
+    <p>{e(desc)}</p>
+    <a class="open" href="../../#/team/{slug}">Open the full {e(name)} page: rating history, roster values, and schedule →</a>
+    <table><tbody>{table}</tbody></table>
+    <p class="muted small">{"Updated " + e(str(updated)) + ". " if updated else ""}Power is how many points per 100 possessions {e(name)} would beat an average {"team" if pro else "Division I team"} by on a neutral floor (0 = average). Offense and defense are adjusted points scored and allowed per 100 possessions.</p>
+  </main>
+  <footer class="wrap footer"><span>hoop2vec · {L['full']}</span><a href="https://github.com/mkearney/hoop2vec">source</a></footer>
+</body>
+</html>
+'''
+
+
+def write_team_pages() -> dict[str, list[str]]:
+    """Writes docs/<league>/team/<slug>/index.html for every team in each league's ratings. Returns the slugs."""
+    import shutil
+    from .share import _load
+    out = {}
+    for lg in LEAGUES:
+        r = _load(lg, "ratings.json") or {}
+        base = SITE_ROOT / lg / "team"
+        shutil.rmtree(base, ignore_errors=True)
+        out[lg] = []
+        for t in r.get("teams") or []:
+            if not t.get("slug") or not t.get("team"):
+                continue
+            d = base / t["slug"]
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "index.html").write_text(team_page(lg, t, r.get("updated")))
+            out[lg].append(t["slug"])
+    return out
+
+
 def write():
     from .share import build
     summaries = build()  # also redraws the share images
@@ -321,16 +378,19 @@ def write():
         d.mkdir(parents=True, exist_ok=True)
         (d / "index.html").write_text(league_page(lg, summaries.get(lg)))
     (SITE_ROOT / ".nojekyll").touch()
-    write_crawl_files(summaries)
+    write_crawl_files(summaries, write_team_pages())
 
 
-def write_crawl_files(summaries: dict):
-    """robots.txt, sitemap.xml (with each page's data update time) and llms.txt (a plain-text guide for AI tools)."""
+def write_crawl_files(summaries: dict, teams: dict[str, list[str]] | None = None):
+    """robots.txt, sitemap.xml (with each page's data update time, and every team page) and llms.txt (a plain-text
+    guide for AI tools)."""
     from .share import SITE_URL
     (SITE_ROOT / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {SITE_URL}/sitemap.xml\n")
     pages = [("", summaries.get("home", {}))] + [(f"{lg}/", summaries.get(lg, {})) for lg in LEAGUES]
+    pages += [(f"{lg}/team/{slug}/", summaries.get(lg, {})) for lg, slugs in (teams or {}).items() for slug in slugs]
     urls = "".join(f"  <url><loc>{SITE_URL}/{p}</loc>" + (f"<lastmod>{S['iso']}</lastmod>" if S.get("iso") else "")
-                   + "<changefreq>hourly</changefreq></url>\n" for p, S in pages)
+                   + ("<changefreq>hourly</changefreq>" if "/team/" not in p else "<changefreq>daily</changefreq>")
+                   + "</url>\n" for p, S in pages)
     (SITE_ROOT / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
                                            f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{urls}</urlset>\n')
     lines = ["# hoop2vec", "",

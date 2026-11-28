@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://hoop2vec.net/sitemap.xml

@@ -2,7 +2,7 @@ name: live-refresh
 
 # Every 10 minutes: re-publish the leagues whose games have just finished (hoop2vec/live.py). A run with nothing new
 # ends after the check job (a few seconds, nothing installed). Live data goes to Pages and the Actions cache, never to
-# git; the overnight daily refresh stays the committed record and takes over again each morning.
+# git; the overnight daily refresh stays the published record (site-data branch) and takes over again each morning.
 
 on:
   schedule:
@@ -86,6 +86,9 @@ jobs:
           out=$(python3 -m hoop2vec.live check-one | tail -n1)
           echo "$out"
           [[ "$out" == new* ]] && echo "run=true" >> "$GITHUB_OUTPUT" || echo "run=false" >> "$GITHUB_OUTPUT"
+      - name: Published site data (site-data branch)
+        if: steps.need.outputs.run == 'true'
+        run: scripts/site_data.sh pull
       - uses: actions/setup-python@v6
         if: steps.need.outputs.run == 'true'
         with:

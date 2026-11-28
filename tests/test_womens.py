@@ -76,3 +76,28 @@ def test_site_pages(tmp_path, monkeypatch):
         assert all(f'href="../{o}/"' in page for o in ("mens", "womens", "nba", "wnba"))
         pro = lg in ("nba", "wnba")
         assert ('#/playoffs' in page) == pro and ('#/prospects' in page) != pro and ('#/bracket' in page) != pro
+
+
+def test_team_pages(tmp_path, monkeypatch):
+    import json
+
+    from hoop2vec import share, site
+    monkeypatch.setattr(site, "SITE_ROOT", tmp_path)
+    monkeypatch.setattr(share, "SITE_ROOT", tmp_path)
+    d = tmp_path / "mens" / "data"
+    d.mkdir(parents=True)
+    (d / "ratings.json").write_text(json.dumps({"updated": "2026-11-28 15:23 UTC", "teams": [
+        {"rank": 1, "team": "Illinois", "slug": "illinois", "power": 41.1, "wins": 7, "losses": 1, "conf": "B10",
+         "eff_o": 132.9, "eff_o_rank": 1.0, "eff_d": 94.6, "eff_d_rank": 15.0},
+        {"rank": 2, "team": "Texas A&M", "slug": "texas-a-m", "power": -3.0}]}))
+    stale = tmp_path / "mens" / "team" / "gone" / "index.html"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("old")
+    slugs = site.write_team_pages()
+    assert slugs["mens"] == ["illinois", "texas-a-m"] and not stale.exists()
+    page = (tmp_path / "mens" / "team" / "illinois" / "index.html").read_text()
+    assert 'rel="canonical" href="https://hoop2vec.net/mens/team/illinois/"' in page
+    assert 'href="../../#/team/illinois"' in page and "<td>132.9 (#1)</td>" in page and "#1 in Division I" in page
+    assert "Texas A&amp;M" in (tmp_path / "mens" / "team" / "texas-a-m" / "index.html").read_text()
+    site.write_crawl_files({}, slugs)
+    assert "<loc>https://hoop2vec.net/mens/team/texas-a-m/</loc>" in (tmp_path / "sitemap.xml").read_text()

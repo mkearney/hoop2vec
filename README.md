@@ -8,7 +8,8 @@ from scratch every morning.
 
 **Site:** https://hoop2vec.net/ (GitHub Pages, served from `docs/`). The home page picks a league:
 `docs/mens/`, `docs/womens/`, `docs/nba/`, and `docs/wnba/` run the same app (`docs/assets/`) on their own data
-(`docs/<league>/data/`).
+(`docs/<league>/data/`). Every team also gets a static page (`docs/<league>/team/<slug>/`) that search engines can
+index.
 
 ## What's on the site
 
@@ -303,7 +304,7 @@ python -m hoop2vec history    # after a season ends: refresh the committed histo
 python -m hoop2vec ingest 2015-2026   # play-by-play for past seasons (only needed to refit identities)
 python -m hoop2vec shots 2022-2026    # one-time backfill of shot locations for past seasons (player shot charts)
 python -m hoop2vec style      # refit the team-identity model from the play-by-play seasons
-python -m hoop2vec site       # rewrite the page shells (docs/index.html chooser + docs/<league>/index.html)
+python -m hoop2vec site       # rewrite the page shells (docs/index.html chooser + docs/<league>/index.html), team pages
 
 python -m hoop2vec daily --womens     # any mode, for another league: --womens, --nba, --wnba (default: --mens)
 python -m hoop2vec tune --nba         # re-tune the dynamic rating for a league (kept only if it helps)
@@ -318,7 +319,20 @@ least 10 seconds apart, as its robots.txt asks. A daily run never downloads Torv
 player games come from a frozen Torvik snapshot plus ESPN box scores. If Torvik refuses a request (it has blocked
 GitHub's runners), the snapshot is used and newer games are filled in from ESPN.
 
-To preview locally: `cd docs && python -m http.server`.
+**Site data lives on its own branch.** Everything under `docs/<league>/data/` changes several times a day, so it isn't
+committed to `main` (it grew the repository by megabytes a day). It lives on the `site-data` branch, which always holds
+a single commit: each publish replaces it, so its history never grows. Page shells, share images, team pages, and
+crawl files are rebuilt from that data at every deploy and aren't committed anywhere.
+
+```bash
+scripts/site_data.sh pull                           # put the published data into docs/<league>/data/
+python -m hoop2vec site                             # page shells and team pages for that data
+scripts/site_data.sh push "Retrain (mens)" mens     # publish docs/mens/data/ (only the leagues named)
+```
+
+A push by hand starts a Pages deploy. To preview locally: `scripts/site_data.sh pull`, `python -m hoop2vec site`, then
+`cd docs && python -m http.server`. To check every view in a browser: `node tests/smoke/smoke.mjs docs` (needs
+Playwright).
 
 ### Manual controls
 
@@ -329,12 +343,14 @@ To preview locally: `cd docs && python -m http.server`.
 ### Automation
 
 * `.github/workflows/daily.yml`: every morning, all four leagues in turn (a league out of season has nothing new).
-  The committed record of the site.
+  The published record of the site (`site-data` branch); model artifacts and `history/` go to `main`.
 * `.github/workflows/live.yml`: every 10 minutes, updates leagues as their games finish (below).
 * `.github/workflows/retrain.yml`: monthly retrain + backtest for every league, or on demand.
 * `.github/workflows/backfill-shots.yml`: on demand, backfill past seasons' shot locations for one league and re-publish.
-* `.github/workflows/pages.yml`: deploys `docs/` to GitHub Pages. The other workflows call it after they publish,
-  and it also runs when a push to `main` changes `docs/`.
+* `.github/workflows/pages.yml`: deploys the app from `main` with the data from `site-data`. The other workflows
+  call it after they publish, and it also runs when a push to `main` or `site-data` changes `docs/`.
+* `.github/workflows/smoke.yml`: opens every league in Chromium and walks the main views (`tests/smoke/smoke.mjs`),
+  when the app changes and after each daily refresh.
 
 Enable Pages once: **Settings → Pages → Source → GitHub Actions**.
 
@@ -345,7 +361,7 @@ publish, the run ends there, after a few seconds. Otherwise each league with new
 ESPN on top of the Torvik snapshot, never barttorvik.com), completed seasons reused from the data cache, no
 training, and no prospect boards. It takes about 1–2 minutes plus setup. Live data never goes into git. Each
 league's latest site data and the list of finals it includes live in the Actions cache (`live/<league>/`), and the
-Pages deploy puts them over the committed `docs/` wherever they're newer. The next morning's daily run is newer
+Pages deploy puts them over the published data wherever they're newer. The next morning's daily run is newer
 again and takes over. Run `live.yml` by hand with **force** to refresh every league in season right away.
 
 Completed seasons are reused exactly, not approximated: the slow per-season steps (rating snapshots, roster
@@ -380,6 +396,8 @@ history/<league>/    compact committed copy of completed seasons (games, players
 artifacts/<league>/  trained models, blend weight, crosswalk, team metadata, style model, backtests
 overrides/<league>/  hand-edited injuries and bracket
 docs/                static site: index.html (choose a league), assets/ (shared app), mens/ womens/ nba/ wnba/
+scripts/site_data.sh publish and fetch the site data (site-data branch)
+tests/smoke/         browser smoke test of every league's views
 ```
 
 ## Origin

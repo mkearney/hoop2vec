@@ -1,14 +1,16 @@
 name: pages
 
-# Deploys docs/ to GitHub Pages, with each league's latest live data (live.yml) on top wherever it is newer than the
-# committed data. Needs Settings -> Pages -> Source: "GitHub Actions".
+# Deploys docs/ to GitHub Pages: the app from main, each league's published data from the site-data branch
+# (scripts/site_data.sh), and its latest live data (live.yml) on top wherever that is newer. Page shells, share
+# images, team pages and crawl files are built here from that data. Needs Settings -> Pages -> Source: "GitHub Actions".
 #
 # The live, daily, retrain and backfill workflows call this after they publish. It also runs on pushes to main that
-# change docs/ (a push made by a workflow doesn't start other workflows, hence the explicit calls).
+# change docs/ and on pushes to site-data made by hand (a push made by a workflow doesn't start other workflows,
+# hence the explicit calls).
 
 on:
   push:
-    branches: [main]
+    branches: [main, site-data]
     paths: ["docs/**"]
   workflow_dispatch:
   workflow_call:
@@ -32,6 +34,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: main             # the newest commit, including what the calling workflow just pushed
+      - name: Published site data (site-data branch)
+        run: scripts/site_data.sh pull
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -61,7 +65,7 @@ jobs:
           path: live/wnba
           key: hoop2vec-live-wnba-${{ github.run_id }}
           restore-keys: hoop2vec-live-wnba-
-      - name: Put newer live data over the committed data
+      - name: Put newer live data over the published data
         run: python -m hoop2vec.live overlay
       - name: Page shells, share images and crawl files for the data being deployed
         run: python -m hoop2vec site

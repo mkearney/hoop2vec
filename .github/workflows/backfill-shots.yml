@@ -34,6 +34,8 @@ jobs:
       SEASONS: ${{ inputs.seasons }}
     steps:
       - uses: actions/checkout@v5
+      - name: Published site data (site-data branch)
+        run: scripts/site_data.sh pull
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -64,10 +66,7 @@ jobs:
         run: |
           git config user.name "Michael W. Kearney"
           git config user.email "13401460+mkearney@users.noreply.github.com"
-          git add docs
-          git diff --cached --quiet || git commit -m "Backfill shot locations ($LEAGUE $SEASONS)"
-          git pull --rebase --autostash
-          git push
+          scripts/site_data.sh push "Backfill shot locations ($LEAGUE $SEASONS)" "$LEAGUE"
 
   deploy:                      # Pages deploys from Actions (pages.yml): publish what was just committed
     needs: backfill

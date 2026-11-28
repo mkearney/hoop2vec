@@ -485,3 +485,10 @@ h2.day { margin: 22px 0 10px; font-size: 16px; }
 .zdot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; border: 1px solid var(--border); }
 table.career tr.total td { border-top: 1px solid var(--border); font-weight: 600; }
 table.zones td:first-child { min-width: 128px; }
+
+/* static team pages (site.py team_page): one per team, for search engines and shared links */
+.team-static { padding-top: 24px; padding-bottom: 32px; }
+.team-static table { border-collapse: collapse; font-size: 14px; margin: 12px 0 16px; }
+.team-static th, .team-static td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--border); text-align: left; }
+.team-static th { font-weight: 500; color: var(--text-2); }
+.team-static .open { display: inline-block; margin: 4px 0 8px; font-weight: 600; }

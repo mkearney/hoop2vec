@@ -1,0 +1,47 @@
+name: smoke
+
+# Opens every league's site in a real browser (Chromium) and walks the main views, the team route, and a static team
+# page (tests/smoke/smoke.mjs). Runs when the app or the page builder changes, after each daily refresh (new data can
+# break a view too), and on demand. It reads the published data (site-data branch) and builds the page shells the
+# same way the Pages deploy does.
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/assets/**", "hoop2vec/site.py", "hoop2vec/share.py", "hoop2vec/brand.py", "scripts/**",
+            "tests/smoke/**", ".github/workflows/smoke.yml"]
+  pull_request:
+  workflow_run:
+    workflows: [daily-refresh]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || '' }}
+      - name: Published site data (site-data branch)
+        run: scripts/site_data.sh pull
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Page shells and team pages
+        run: |
+          pip install "$(grep -i '^pillow' requirements.txt)"
+          python -m hoop2vec site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.65.1
+          npx playwright install --with-deps chromium
+      - name: Smoke test
+        run: node tests/smoke/smoke.mjs docs

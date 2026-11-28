@@ -10,3 +10,15 @@ artifacts/*/backtest_games.parquet
 
 # experiment predictions (research/experiment.py)
 research/results/
+
+# Published site data lives on the site-data branch (scripts/site_data.sh pull / push), not on main. Page shells,
+# share images, team pages and crawl files are rebuilt from it at every Pages deploy (python -m hoop2vec site).
+/docs/*/data/
+/docs/*/team/
+/docs/index.html
+/docs/*/index.html
+/docs/share.png
+/docs/*/share.png
+/docs/robots.txt
+/docs/sitemap.xml
+/docs/llms.txt
