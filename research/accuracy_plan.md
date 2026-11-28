@@ -211,3 +211,46 @@ already works.
 | Closing lines as a training target | 970 lines, all since 2025-26 | 15,487 lines since 2013, mostly consensus | 352 lines |
 | Home edge by era and altitude | Small | Denver and Utah | Small |
 | Lineup-based player values | Would help | Already built | Already built |
+
+## Progress, 2026-11-28
+
+Every number here comes from `research/experiment.py` (log in `research/experiments.jsonl`). Dev seasons are 2012 to
+2024 and the holdout is 2025 and 2026 for men's; for the other leagues the last two seasons are the holdout. Each
+change is compared with the run before it, on the same games.
+
+### Men's
+
+| Step | Kalman | Linear | Blend (dev) | Blend (holdout) | Kept |
+|---|---|---|---|---|---|
+| Old code | 0.5259 | 0.5217 | 0.5175 | 0.5188 | |
+| Phase 0: season-ahead fits, date-known centering, pre-game availability in training | 0.5259 | 0.5219 | 0.5174 | 0.5181 | Yes |
+| Phase 0, but trained on realized availability | 0.5259 | 0.5219 | 0.5175 | 0.5189 | No |
+| Kalman season start from the roster prior | 0.5250 | 0.5215 | 0.5174 | 0.5180 | Yes |
+| Plus a 25 percent opponent 3-point luck discount | 0.5242 | 0.5210 | 0.5173 | 0.5179 | Yes |
+| Measured availability rates | 0.5242 | 0.5210 | 0.5173 | 0.5178 | Yes (no effect, but measured) |
+| Kalman settings re-tuned with both on | 0.5204 | 0.5194 | 0.5169 | 0.5174 | Yes |
+| Network also trained toward past closing lines | 0.5204 | 0.5194 | 0.5173 | 0.5184 | No |
+| Blend weight by phase of season | | | 0.5173 | 0.5179 | No (gain of 0.00005, within noise) |
+
+The Kalman rating improved the most, from 0.5259 to 0.5204, and now beats adjusted efficiency (0.5246) instead of
+trailing it. The linear model went from 0.5217 to 0.5194. The blend moved much less, from 0.5177 to 0.5170, because
+the network already used the roster information the Kalman was missing. The Kalman tuning was fit on 2010 to 2023,
+so its dev-season gain is partly in-sample; the holdout gain (-0.0004) is not.
+
+The re-tuned settings carry almost nothing of last season over by itself (`rho0` 0.003, `rho1` 0.30) and lean on the
+roster prior instead (weight 1.15), with a third of opponent 3-point luck discounted.
+
+Two bugs turned up along the way. The cache of completed seasons (`memo.py`) was keyed on a step's inputs but not
+its settings, so a change to the availability rates would have kept the old rates for every past season, in
+experiments and in the daily job. The keys now include the settings. And with season-ahead fits, a pro league's first
+seasons have too few teams for the full prior formula; `make_prior` now falls back to last season's rating alone.
+
+### Other leagues
+
+| League, change | Kalman (dev) | Blend (dev) | Blend (holdout) | Kept |
+|---|---|---|---|---|
+| Women's, Phase 0 | 0.0000 | +0.0002 | +0.0005 | Yes (honest cost of the leak fixes) |
+| Women's, roster prior + 25 percent luck discount | -0.0041 | -0.0012 | +0.0003 | Yes |
+| WNBA, Phase 0 | 0.0000 | +0.0016 | -0.0004 | Yes (as above; 12 teams a season leave early priors thin) |
+| WNBA, Phase 0 but realized availability | | -0.0009 | +0.0004 | No (inconclusive) |
+| WNBA, roster prior + luck, settings tuned | -0.0016 | -0.0007 | -0.0009 | Yes |

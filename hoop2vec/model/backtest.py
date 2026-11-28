@@ -147,6 +147,9 @@ def run(feat: pd.DataFrame, models: dict, seasons, lines: pd.DataFrame | None = 
     out = []
     for S in seasons:
         tr = training_view(f[f["season"] < S])
+        if lines is not None and len(lines):  # past seasons' closing lines: a training target only (train.LINE_WEIGHT)
+            tr = tr.merge(lines[["season", "gid", "line_a"]].drop_duplicates(["season", "gid"]), on=["season", "gid"],
+                          how="left")
         te = pregame_view(f[f["season"] == S])
         if te.empty:
             continue

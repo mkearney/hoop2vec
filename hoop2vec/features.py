@@ -137,7 +137,9 @@ def fit_priors(final: dict, roster0: pd.DataFrame):
 
 
 def _enough(sub):
-    return len(sub) > 200
+    # 4 coefficients; college seasons have ~350 teams, but a pro league's first fits (12 to 30 teams a season) need
+    # a lower bar to use the roster terms at all
+    return len(sub) > 60
 
 
 def season_ahead_coefs(final: dict, roster0: pd.DataFrame, seasons) -> dict:
@@ -166,7 +168,9 @@ def make_prior(season, final, roster0, coefs, teams):
             pv = (pser - pser.mean()).reindex(teams).to_numpy(float)
         else:
             pv = np.full(len(teams), np.nan)
-        if c.startswith("eff_"):
+        if c.startswith("eff_") and len(cf["beta"]) < 4:  # too little data for the roster terms: last season only
+            v = np.where(~np.isnan(pv), cf["beta"][0] * pv, 6.0 if c == "eff_d" else -6.0)
+        elif c.startswith("eff_"):
             b, b2 = cf["beta"], cf["beta_noprev"]
             full = b[0] * pv + b[1] * ro + b[2] * rd + b[3]
             noprev = b2[0] * ro + b2[1] * rd + b2[2]
@@ -179,9 +183,13 @@ def make_prior(season, final, roster0, coefs, teams):
     return out
 
 
+PRIOR_GAMES = 5.0  # weight of the preseason prior in the efficiency ratings, in games
+
+
 def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.DataFrame,
-          availability: dict | None = None, prior_games: float = 5.0):
+          availability: dict | None = None, prior_games: float | None = None):
     """Returns (features per game, snapshots, live dict, extras)."""
+    prior_games = PRIOR_GAMES if prior_games is None else prior_games
     g = games[(games["type"] != "nond1")].copy()
     g = g.sort_values(["date", "gid"]).reset_index(drop=True)
     played = g[g["played"] & g["poss"].notna() & (g["poss"] > 0)]
@@ -227,7 +235,7 @@ def build(games: pd.DataFrame, pg: pd.DataFrame, ps: pd.DataFrame, conf: pd.Data
         if rows is None or rows.empty:
             continue
         snap_dates = list(dates) + extra
-        k = memo.key(rows, teams, prior, snap_dates, prior_games)
+        k = memo.key(rows, teams, prior, snap_dates, prior_games, (EF.HALF_LIFE_DAYS, EF.WEIGHT_FLOOR, EF.STATS))
         reuse = s < current_season() and stored.has(s, k)  # completed season, same inputs as the last run
         sn = stored.season(s) if reuse else EF.season_snapshots(rows, teams, prior, snap_dates, prior_games=prior_games)
         sn["season"] = s

@@ -39,9 +39,12 @@ from scratch every morning.
 | [Her Hoop Stats](https://herhoopstats.com) | ❌ | ✅ | ❌ | ✅ | 💲 | 💲 | ✅ | ✅ | ❌ |
 | [Dunks & Threes](https://dunksandthrees.com) | ❌ | ❌ | 💲 | ❌ | 💲 | 💲 | 💲 | 💲 | ❌ |
 
-A checkmark doesn't mean equal quality. KenPom and Torvik have years of trust that hoop2vec hasn't earned, and
-hoop2vec has never been tested head to head against them. EvanMiya's college player ratings and Dunks & Threes' NBA
-ones are more sophisticated than hoop2vec's. A sharp sportsbook still beats hoop2vec during the regular season.
+A checkmark doesn't mean equal quality. KenPom and Torvik have years of trust that hoop2vec hasn't earned. One head
+to head exists: barttorvik.com keeps T-Rank's own pre-game win probability for every game since 2015, written before
+tip-off and never changed afterward, and on those 65,392 games the hoop2vec backtest scores better in every season
+(log loss 0.5212 vs 0.5275). KenPom's predictions aren't free to check. EvanMiya's college player ratings and Dunks &
+Threes' NBA ones are more sophisticated than hoop2vec's. A sharp sportsbook still beats hoop2vec during the regular
+season.
 
 ## Ratings and players
 
@@ -114,23 +117,34 @@ prospects aren't modeled.
 Season-ahead, 2012–2026: for each test season every model is trained only on earlier seasons, then predicts every
 game from features as of the day before, with availability knowable before tip-off. Log loss, lower is better:
 
-| Model | All games (81,758) | NCAA tournament (936) | Sportsbook lines, 2025-26 (5,499) |
-|---|---|---|---|
-| **hoop2vec blend** (70% network + 30% linear, live model) | **0.5176** | 0.5464 | 0.5472 |
-| Matchup network (all features) | 0.5182 | 0.5490 | 0.5484 |
-| Matchup network (core features) | 0.5183 | 0.5495 | 0.5481 |
-| Linear game model | 0.5217 | **0.5445** | 0.5492 |
-| Adjusted efficiency (AdjEM) | 0.5246 | 0.5452 | 0.5493 |
-| Dynamic (Kalman) rating | 0.5259 | 0.5461 | 0.5527 |
-| Elo | 0.5382 | 0.5660 | 0.5676 |
-| DraftKings line (benchmark only) | – | – | **0.5422** |
+| Model | All games (81,758) | NCAA tournament (936) | Sportsbook lines, 2025-26 (5,499) | T-Rank games, 2015–2026 (65,392) |
+|---|---|---|---|---|
+| **hoop2vec blend** (70% network + 30% linear, live model) | **0.5170** | 0.5461 | 0.5454 | **0.5212** |
+| Matchup network (all features) | 0.5175 | 0.5481 | 0.5457 | 0.5216 |
+| Matchup network (core features) | 0.5178 | 0.5489 | 0.5457 | 0.5219 |
+| Linear game model | 0.5194 | 0.5449 | 0.5479 | 0.5238 |
+| Dynamic (Kalman) rating | 0.5204 | 0.5450 | 0.5486 | 0.5245 |
+| Adjusted efficiency (AdjEM) | 0.5246 | **0.5447** | 0.5493 | 0.5293 |
+| Elo | 0.5382 | 0.5660 | 0.5676 | 0.5421 |
+| DraftKings line (benchmark only) | – | – | **0.5422** | – |
+| T-Rank pre-game probability (benchmark only) | – | – | – | 0.5275 |
 
-The blend beats the linear model on all games by 0.0040 log loss (95% CI 0.0035–0.0047) and was chosen on that.
-In each season of the table, its weight comes only from earlier seasons. On the 936 tournament games every
-reasonable model is within noise of the others, and play-by-play style factors add nothing measurable. A real
-sportsbook is still better than the model during the regular season and level with it in March, as you'd expect
-from an honest public-data model. ESPN's older "consensus" lines (2015–2023) are soft, especially in November:
-the blend beats them on 41,280 games (0.5258 vs 0.5331), so they are not used as evidence of skill.
+The blend beats the linear model on all games by 0.0024 log loss (95% CI 0.0020–0.0029) and was chosen on that.
+In each season of the table, its weight comes only from earlier seasons. It picks the winner 73.5% of the time. On the
+936 tournament games every reasonable model is within noise of the others, and play-by-play style factors add
+nothing measurable. T-Rank's stored pre-game probabilities lose to the blend in all 12 seasons they cover, by
+0.003 to 0.010. A real sportsbook is still better than the model during the regular season and level with it in
+March, as you'd expect from an honest public-data model. ESPN's older "consensus" lines (2015–2023) are soft,
+especially in November: the blend beats them on 41,280 games (0.5253 vs 0.5330), so they are not used as
+evidence of skill.
+
+The November 2026 changes (`research/accuracy_plan.md`, every experiment logged in `research/experiments.jsonl`)
+moved the blend from 0.5176 to 0.5170 and cut the DraftKings gap from 0.0050 to 0.0032. Most of it came from the
+dynamic rating, which went from 0.5259 to 0.5204. It now starts each season from the roster-based preseason prior
+instead of the league average, ignores a third of each opponent's 3-point luck, and was re-tuned with both in place.
+The backtest also got stricter: every fitted piece (preseason prior coefficients, class progression, the recruiting
+slope) now uses only seasons before the one it predicts, and both game models train on the same pre-game
+availability estimate they are tested on.
 
 ## Women's basketball
 
@@ -247,7 +261,10 @@ models (below).
 **Availability.** Before a game, players' chances of playing come from recent missed games. College players who miss
 a game are usually hurt; pros rest. Measured on 2008-2026 regulars: after missing 1, 2, or 3+ games an NBA player
 plays the next one 55%, 36%, and 12% of the time, but in the first playoff game 91%, 84%, and 76% (end-of-season
-rest). Those league-specific rates replace the college ones, so a rested star no longer reads as out for a series.
+rest). A men's college regular plays the next game 52% of the time after missing one, 35% after two, then 24%, 18%,
+and 13% after three to five, and 5% after six or more. Each league uses its own rates, so a rested star no longer
+reads as out for a series. Every day's injury report is also saved (`history/<league>/injuries_<season>.parquet`), so
+a season of real injury news builds up for training and backtests.
 
 **Styles.** Identity models are fitted on each league's play-by-play (570 NBA and 220 WNBA team-seasons), with fewer
 archetypes than college (6/5/5 and 4/4/4) and names carried over from the men's model where the dimensions match,

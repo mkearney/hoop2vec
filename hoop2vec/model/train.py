@@ -19,6 +19,14 @@ ROSTER_COLS = ["roster", "roster_o", "roster_d", "avail_delta", "height", "exper
 ROSTER_IDX = torch.tensor([TEAM_FEATS.index(c) for c in ROSTER_COLS])  # used only if ROSTER_DROPOUT > 0
 ROSTER_DROPOUT = 0.0  # tested 0.05-0.15: hurts accuracy; missing roster is imputed instead
 N_MODELS = 5
+LR, MAX_LR, WEIGHT_DECAY = 2e-3, 3e-3, 1e-4
+POST_WEIGHT, EARLY_WEIGHT = 1.5, 0.6  # sample weights: postseason games, games where a team has played < 3
+# Closing lines as a second training target (never an input): where a past game has a line (column line_a), the loss
+# adds LINE_WEIGHT x ((mu - line) / LINE_SD)^2 / 2, pulling the predicted margin toward the market's estimate, which
+# is less noisy than the final score. sigma is still fit on actual margins only. Off: on the men's backtest
+# (2026-11-28) weight 1 made the blend worse by 0.0004 on dev seasons and 0.0010 on the holdout, probably because most
+# past lines are ESPN's soft consensus lines. Worth another look once a few seasons of sportsbook lines exist.
+LINE_WEIGHT, LINE_SD = 0.0, 6.0
 
 
 def season_means(feat: pd.DataFrame) -> pd.DataFrame:
@@ -98,14 +106,17 @@ def prepare(df, smeans, norm=None, feats=None, row_means=None):
     return norm(xa), norm(xb), ctx_matrix(df), norm
 
 
-def train_models(df: pd.DataFrame, smeans, n_models=N_MODELS, epochs=EPOCHS, seed=0, verbose=False,
+def train_models(df: pd.DataFrame, smeans, n_models=N_MODELS, epochs=None, seed=0, verbose=False,
                  val: pd.DataFrame | None = None, feats=None):
+    epochs = EPOCHS if epochs is None else epochs
     df = df[df["played"] & df["margin"].notna()]
     xa, xb, cx, norm = prepare(df, smeans, feats=feats, row_means=season_means_asof(df))
     y = df["margin"].to_numpy(float)
-    w = np.where(df["is_post"] > 0, 1.5, 1.0) * np.where((df["a_games"] < 3) | (df["b_games"] < 3), 0.6, 1.0)
+    w = np.where(df["is_post"] > 0, POST_WEIGHT, 1.0) * np.where((df["a_games"] < 3) | (df["b_games"] < 3), EARLY_WEIGHT, 1.0)
     T = lambda a: torch.tensor(a, dtype=torch.float32)  # noqa: E731
     xa_t, xb_t, cx_t, y_t, w_t = map(T, (xa, xb, cx, y, w))
+    line = df["line_a"].to_numpy(float) if (LINE_WEIGHT > 0 and "line_a" in df) else np.full(len(df), np.nan)
+    has_t, line_t = T(np.isfinite(line).astype(float)), T(np.nan_to_num(line))
     if val is not None:
         vxa, vxb, vcx, _ = prepare(val, smeans, norm, feats=feats, row_means=season_means_asof(val))
         vy = val["margin"].to_numpy(float)
@@ -115,8 +126,8 @@ def train_models(df: pd.DataFrame, smeans, n_models=N_MODELS, epochs=EPOCHS, see
         torch.manual_seed(seed * 100 + m)
         rng = np.random.default_rng(seed * 100 + m)
         net = MatchupNet(xa.shape[1])
-        opt = torch.optim.AdamW(net.parameters(), lr=2e-3, weight_decay=1e-4)
-        sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=3e-3, total_steps=epochs * math.ceil(n / 1024))
+        opt = torch.optim.AdamW(net.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+        sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=MAX_LR, total_steps=epochs * math.ceil(n / 1024))
         for ep in range(epochs):
             net.train()
             perm = rng.permutation(n)
@@ -130,6 +141,9 @@ def train_models(df: pd.DataFrame, smeans, n_models=N_MODELS, epochs=EPOCHS, see
                     bx[drop.nonzero(as_tuple=True)[0][:, None], ROSTER_IDX] = 0.0
                 mu, sg = net(ba, bb, cx_t[idx])
                 loss = gaussian_nll(mu, sg, y_t[idx], w_t[idx])
+                if LINE_WEIGHT > 0:
+                    hl = has_t[idx]
+                    loss = loss + LINE_WEIGHT * (hl * ((mu - line_t[idx]) / LINE_SD) ** 2).sum() / (2 * len(idx))
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -180,6 +194,7 @@ def log_loss(y, p):
 # ---------------------------------------------------------------- persistence / web
 def save(models, norm, smeans, path):
     torch.save({"state": [m.state_dict() for m in models], "d_team": len(TEAM_FEATS),
+                "h": models[0].enc[0].out_features, "e": models[0].enc[3].out_features,
                 "norm": norm.to_dict(), "smeans": smeans.reset_index().to_dict(orient="list")}, path)
 
 
@@ -187,7 +202,7 @@ def load(path):
     blob = torch.load(path, weights_only=False)
     models = []
     for st in blob["state"]:
-        m = MatchupNet(blob["d_team"])
+        m = MatchupNet(blob["d_team"], h=blob.get("h", 64), e=blob.get("e", 24))
         m.load_state_dict(st)
         m.eval()
         models.append(m)

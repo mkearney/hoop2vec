@@ -180,13 +180,21 @@ def team_player_features(games: pd.DataFrame, pg: pd.DataFrame, priors: pd.DataF
         ps_ = pgi.loc[pgi["season"] == season, _PG_COLS]
         pr = priors.loc[priors["season"] == season, _PRI_COLS]
         if season < cur:  # completed season: an earlier run's result for the same inputs (no live injuries apply)
-            frames.append(memo.cached(f"player-feats-{season}", (gs, ps_, pr), lambda: pd.DataFrame(
+            frames.append(memo.cached(f"player-feats-{season}", (gs, ps_, pr, _settings()), lambda: pd.DataFrame(
                 _season_player_features(gs, ps_, pr, {}, cur)[0], columns=_PF_COLS)))
         else:
             rows, lv = _season_player_features(gs, ps_, pr, availability or {}, cur)
             frames.append(pd.DataFrame(rows, columns=_PF_COLS))
             live.update(lv)
     return pd.concat(frames, ignore_index=True), live
+
+
+def _settings() -> dict:
+    """Everything besides the inputs that shapes the player features, so a stored season is reused only when these
+    are unchanged too (part of its memo key)."""
+    from .config import LEAGUE
+    return {"avail": _miss_probs(), "first_post": AVAIL_FIRST_POST.get(LEAGUE), "k_min": K_MIN, "k_new": K_NEW,
+            "new_prior": NEW_PRIOR, "v_repl": V_REPL, "part_decay": PART_DECAY, "curve": MINUTES_CURVE}
 
 
 _G_COLS = ["season", "date", "gid", "team_a", "team_b", "played", "minutes", "type"]
@@ -416,11 +424,13 @@ def deleak_bpm(pg: pd.DataFrame, games: pd.DataFrame, kpre: pd.DataFrame, conf: 
     return pg
 
 
-# P(plays the next game) for a regular who missed the last 1, 2, 3+ games. College: a missed game is usually an
-# injury. Pros rest a lot (back-to-backs, the end of the season), measured on 2008-2026 regulars: NBA 55% / 36% /
-# 12%, WNBA 49% / 34% / 12%. In the first postseason game, players who sat the last regular-season games almost
+# P(plays the next game) for a regular who missed the last 1, 2, 3, ... games; the last entry covers longer
+# absences too. Men's college, measured on 2009-2026 regulars (10+ minutes a game): 52% after missing one game, 35%
+# after two, then 24 / 18 / 13% after three to five and 5% after six or more (the old guess was 65 / 30 / 5% for
+# 1 / 2 / 3+). Pros rest a lot (back-to-backs, the end of the season), measured on 2008-2026 regulars: NBA 55% / 36%
+# / 12%, WNBA 49% / 34% / 12%. In the first postseason game, players who sat the last regular-season games almost
 # always return: NBA 91% / 84% / 76%, WNBA 85% / 76% / 63%.
-AVAIL_AFTER_MISSES = {"mens": (0.65, 0.3, 0.05), "womens": (0.65, 0.3, 0.05),
+AVAIL_AFTER_MISSES = {"mens": (0.52, 0.35, 0.24, 0.18, 0.13, 0.05), "womens": (0.65, 0.3, 0.05),
                       "nba": (0.55, 0.36, 0.12), "wnba": (0.49, 0.34, 0.12)}
 AVAIL_FIRST_POST = {"nba": (0.91, 0.84, 0.76), "wnba": (0.85, 0.76, 0.63)}
 
@@ -432,6 +442,26 @@ def _miss_probs(first_post: bool = False):
     return AVAIL_AFTER_MISSES.get(LEAGUE, AVAIL_AFTER_MISSES["mens"])
 
 
+def _absence(P: np.ndarray, j: int, cap: int) -> np.ndarray:
+    """Games each player has missed in a row before game j (0 = played game j-1), capped at ``cap``. Games before
+    the first one count as played."""
+    k = P.shape[1]
+    streak = np.zeros(k, int)
+    for m in range(1, cap + 1):
+        if j - m < 0:
+            break
+        go = (streak == m - 1) & (P[j - m] <= 0)
+        if not go.any():
+            break
+        streak[go] = m
+    return streak
+
+
+def _avail_from_streak(streak: np.ndarray, probs) -> np.ndarray:
+    tab = np.r_[1.0, np.asarray(probs, float)]
+    return tab[np.minimum(streak, len(probs))]
+
+
 def _heuristic_avail_matrix(P: np.ndarray, first_post: int | None = None) -> np.ndarray:
     """Row j = expected availability for game j using games < j only (rows 0..n). ``first_post``: index of the
     team's first postseason game (pros), where end-of-season rest no longer predicts absence."""
@@ -439,11 +469,8 @@ def _heuristic_avail_matrix(P: np.ndarray, first_post: int | None = None) -> np.
     A = np.ones((n + 1, k))
     ever = np.vstack([np.zeros((1, k)), np.cumsum(P, 0)]) > 0
     for j in range(n + 1):
-        p1, p2, p3 = _miss_probs(j == first_post)
-        l1 = P[j - 1] if j >= 1 else np.ones(k)
-        l2 = P[j - 2] if j >= 2 else np.ones(k)
-        l3 = P[j - 3] if j >= 3 else np.ones(k)
-        a = np.where(l1 > 0, 1.0, np.where(l2 > 0, p1, np.where(l3 > 0, p2, p3)))
+        probs = _miss_probs(j == first_post)
+        a = _avail_from_streak(_absence(P, j, len(probs)), probs)
         A[j] = np.where(ever[j], a, 0.0)
     return A
 
@@ -458,12 +485,5 @@ def _default_avail(P: np.ndarray, i: int) -> float:
     played_ever = P[:, i].any()
     if not played_ever:
         return 0.0
-    p1, p2, p3 = _miss_probs()
-    last = P[-3:, i]
-    if len(last) >= 3 and last.sum() == 0:
-        return p3  # missed 3 straight: probably out
-    if len(last) >= 2 and last[-2:].sum() == 0:
-        return p2
-    if last[-1] == 0:
-        return p1
-    return 1.0
+    probs = _miss_probs()
+    return float(_avail_from_streak(_absence(P[:, [i]], P.shape[0], len(probs)), probs)[0])

@@ -141,6 +141,10 @@ def training_rows(feat):
 def stage_train(feat, n_models=TR.N_MODELS):
     """Fit both game models on completed seasons only, so this season's tracking is out-of-sample."""
     f = training_rows(feat)
+    if TR.LINE_WEIGHT > 0:  # past closing lines as a second training target for the network (never an input)
+        from . import lines as L
+        la = L.for_games(feat, pd.read_parquet(PROC / "games.parquet"), L.collect())
+        f = f.merge(la[["season", "gid", "line_a"]].drop_duplicates(["season", "gid"]), on=["season", "gid"], how="left")
     smeans = TR.season_means(BT.add_derived(feat[feat["season"] >= FIRST_TRAIN_SEASON]))
     log(f"training {n_models} matchup networks on {len(f):,} games")
     models, norm = TR.train_models(f, smeans, n_models=n_models)

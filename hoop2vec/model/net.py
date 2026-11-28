@@ -18,9 +18,14 @@ import torch.nn.functional as F
 CTX = ["loc", "neutral", "is_ncaa", "is_conftourney", "is_post", "same_conf", "day"]
 
 
+H, E, DROPOUT = 64, 24, 0.10  # hidden width, team embedding size, dropout
+
+
 class MatchupNet(nn.Module):
-    def __init__(self, d_team: int, d_ctx: int = len(CTX), h: int = 64, e: int = 24, dropout: float = 0.10):
+    def __init__(self, d_team: int, d_ctx: int = len(CTX), h: int | None = None, e: int | None = None,
+                 dropout: float | None = None):
         super().__init__()
+        h, e, dropout = (H if h is None else h), (E if e is None else e), (DROPOUT if dropout is None else dropout)
         self.enc = nn.Sequential(nn.Linear(d_team, h), nn.GELU(approximate="tanh"), nn.Dropout(dropout),
                                  nn.Linear(h, e), nn.GELU(approximate="tanh"))
         self.pair = nn.Sequential(nn.Linear(3 * e + d_ctx, h), nn.GELU(approximate="tanh"), nn.Dropout(dropout),
