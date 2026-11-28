@@ -364,10 +364,43 @@ moved in every league but the WNBA; accuracy barely moved anywhere, as expected 
 | NBA (19,186) | 0.6096 | 0.6092 | 66.32% | 66.32% | DraftKings 0.5812 vs blend 0.5965; playoff series 0.566 to 0.556 |
 | WNBA (3,203) | 0.6133 | 0.6141 | 66.13% | 65.91% | Within noise; see the morning table |
 
-### Not done, and why
+## Progress, 2026-11-28 evening: the last open items
 
-The injury model needs a season of the archived reports that started today, so it waits until spring. College
-player values from lineups (Phase 4) were meant to follow it; the injury data will show how much better player
-values could be worth. Home edge by era and altitude were skipped: the only era effect in the backtest is 2021,
-one season of empty arenas, worth about 0.0001 overall by a rough calculation, and altitude needs elevation data the pipeline
-doesn't have.
+### Injury model
+
+The model now uses the injury archive as it grows. Where a player has a report dated the day of a game, the report
+replaces the missed-games estimate in that game's pre-game availability, in training, backtests, and live
+predictions alike. What each status means is measured from the archive (how often a "questionable" player actually
+logged minutes on days his team played), and a status keeps its fixed value until it has 30 cases. The archive held
+one day when this shipped, so it changes nothing yet; it switches on by itself. Of the 115 men's reports in that
+first snapshot, 65 didn't match a player, and every one of those players had yet to play this season, so nothing
+was lost. Remaining step for spring: once a season of reports exists, check the backtest on that season with and
+without them.
+
+### Home edge by era, and altitude
+
+Elevation of every team's home city came from OpenTopoData. Two linear-model tests: an altitude term (the home
+team's elevation above the visitor's, in true home games), and treating games without crowds as neutral (2021 in
+college; the 2020 bubble and the 2021 season in the NBA; the 2020 bubble in the WNBA).
+
+| League | Altitude | No-crowd games as neutral | Both | Both, holdout |
+|---|---|---|---|---|
+| Men's (linear model) | -0.00008 | -0.00007 | -0.00014 (interval -0.00028 to +0.00002) | -0.00005 |
+| NBA (linear model) | -0.00013 | -0.00003 | -0.00009 | +0.00044 |
+
+The linear model carries 30 percent of the men's blend, so the best case is about 0.00004 on the forecasts. Not
+kept.
+
+### College player values from lineups (Phase 4)
+
+The pro recipe (lineup RAPM, with a box-score model fitted to it) was run on women's college, where play-by-play
+lineups exist from 2020. `rapm.py` gained a sparse solver for college-sized player sets. The box model explained 49
+percent of offensive RAPM and 29 percent of defensive (the NBA's: 49 and 15). Forecasts didn't improve: blend -0.0000
+on dev seasons, +0.0010 on the holdout. Men's would need ESPN players matched to Torvik's IDs on top of the same
+recipe, and with the women's result, the flat player-prior experiments, and the 0.0014 ceiling on perfect
+availability, there's no sign it would pay off. The switch stays in `espn_data.RAPM_COLLEGE`, empty.
+
+### What's left
+
+Nothing from the plan is open except the spring check of the injury archive. The forecasts now look limited by
+information the model doesn't have (the sharp market still leads by 0.0027 in men's), not by how the model is built.

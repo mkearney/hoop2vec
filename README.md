@@ -279,8 +279,9 @@ a game are usually hurt; pros rest. Measured on 2008-2026 regulars: after missin
 plays the next one 55%, 36%, and 12% of the time, but in the first playoff game 91%, 84%, and 76% (end-of-season
 rest). A men's college regular plays the next game 52% of the time after missing one, 35% after two, then 24%, 18%,
 and 13% after three to five, and 5% after six or more. Each league uses its own rates, so a rested star no longer
-reads as out for a series. Every day's injury report is also saved (`history/<league>/injuries_<season>.parquet`), so
-a season of real injury news builds up for training and backtests.
+reads as out for a series. Every day's injury report is also saved (`history/<league>/injuries_<season>.parquet`). A report
+dated the day of a game replaces the missed-games estimate for that game, in training and backtests too, and what
+each status means ("questionable", "doubtful") is measured from the archive once it has enough cases.
 
 **Styles.** Identity models are fitted on each league's play-by-play (570 NBA and 220 WNBA team-seasons), with fewer
 archetypes than college (6/5/5 and 4/4/4) and names carried over from the men's model where the dimensions match,
